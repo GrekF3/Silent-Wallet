@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useRef, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Icons } from "./Icon";
 
@@ -12,10 +12,10 @@ export function useToast() { return useContext(Ctx); }
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
-  let counter = 0;
+  const counter = useRef(0);
 
   const show = useCallback((message: string, type: ToastType = "success") => {
-    const id = ++counter;
+    const id = ++counter.current;
     setToasts((p) => [...p, { id, message, type }]);
     setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 2800);
   }, []);

@@ -136,7 +136,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
                     <div style={{ display: "flex", gap: 14, padding: "16px 18px", borderRadius: 12, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
                       <Icons.shield size={18} color="rgba(255,255,255,0.50)" />
                       <p style={{ fontSize: 13, color: "rgba(255,255,255,0.50)", lineHeight: 1.5 }}>
-                        A new 12-word seed phrase will be generated. Write it down and keep it safe — it's the only way to recover your wallet.
+                        A new 12-word seed phrase will be generated. Write it down and keep it safe — it&apos;s the only way to recover your wallet.
                       </p>
                     </div>
                     <GlassButton variant="primary" size="lg" style={{ width: "100%" }} onClick={handleCreate}>
@@ -189,7 +189,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
               <div style={{ display: "flex", gap: 10 }}>
                 <GlassButton variant="ghost" size="lg" style={{ flex: 1 }} onClick={() => setStep("start")}>Back</GlassButton>
                 <GlassButton variant="primary" size="lg" style={{ flex: 1 }} onClick={() => setStep("password")}>
-                  I've saved it <Icons.chevronR size={14} color="#000" />
+                  I&apos;ve saved it <Icons.chevronR size={14} color="#000" />
                 </GlassButton>
               </div>
             </motion.div>

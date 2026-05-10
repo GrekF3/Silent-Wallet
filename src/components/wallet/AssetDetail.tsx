@@ -63,17 +63,19 @@ export function AssetDetail() {
 
   const a   = selectedAsset;
   const pos = a.change24h >= 0;
+  const valueLabel = a.priceUSD > 0 ? formatUSD(a.balance * a.priceUSD) : (a.balance > 0 ? "Pricing..." : formatUSD(0));
   const txs = transactions.filter((t) => t.asset === a.symbol).slice(0, 4);
 
   return (
     <motion.div
+      className="view-shell"
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.22 }}
       style={{ padding: "28px 28px 48px", display: "flex", flexDirection: "column", gap: 22, maxWidth: 720 }}
     >
       {/* ── Back + Header ──────────────────────────────────────── */}
-      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+      <div className="asset-detail-header" style={{ display: "flex", alignItems: "center", gap: 16 }}>
         <button
           onClick={closeAsset}
           style={{
@@ -100,7 +102,7 @@ export function AssetDetail() {
             borderTop: "1px solid rgba(255,255,255,0.20)",
             boxShadow: "0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.09)",
           }}>
-            <CryptoIcon symbol={a.symbol} size={22} />
+            <CryptoIcon symbol={a.symbol} image={a.image} size={22} />
           </div>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -125,15 +127,15 @@ export function AssetDetail() {
       {/* ── Price + chart ──────────────────────────────────────── */}
       <GlassCard elevated style={{ padding: "22px 22px 18px" }}>
         {/* Price row */}
-        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 20 }}>
+        <div className="responsive-row" style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 20 }}>
           <div>
-            <div style={{ fontSize: 36, fontWeight: 300, letterSpacing: "-0.02em", color: "#fff", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>
-              {formatUSD(a.priceUSD)}
+            <div style={{ fontSize: "clamp(28px, 9vw, 36px)", fontWeight: 300, letterSpacing: "-0.02em", color: "#fff", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>
+              {a.priceUSD > 0 ? formatUSD(a.priceUSD) : (a.balance > 0 ? "Pricing..." : "Price unavailable")}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
               {pos ? <Icons.trendUp size={13} color="rgba(255,255,255,0.60)" /> : <Icons.trendDown size={13} color="rgba(255,100,100,0.75)" />}
               <span style={{ fontSize: 13, fontWeight: 500, color: pos ? "rgba(255,255,255,0.65)" : "rgba(255,100,100,0.80)", fontVariantNumeric: "tabular-nums" }}>
-                {pos ? "+" : ""}{a.change24h.toFixed(2)}% today
+                {pos ? "+" : ""}{a.change24h.toFixed(2)}% 24h
               </span>
               <span style={{ fontSize: 12, color: "rgba(255,255,255,0.22)", marginLeft: 4 }}>
                 7d: {a.change7d >= 0 ? "+" : ""}{a.change7d.toFixed(2)}%
@@ -165,10 +167,10 @@ export function AssetDetail() {
       </GlassCard>
 
       {/* ── Holdings + Stats ───────────────────────────────────── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
         {[
           { label: "Your balance",  value: `${formatCrypto(a.balance, 5)} ${a.symbol}` },
-          { label: "Value",         value: formatUSD(a.balance * a.priceUSD) },
+          { label: "Value",         value: valueLabel },
           { label: "24h change",    value: `${a.change24h >= 0 ? "+" : ""}${a.change24h.toFixed(2)}%` },
           { label: "7d change",     value: `${a.change7d >= 0 ? "+" : ""}${a.change7d.toFixed(2)}%` },
         ].map((s) => (

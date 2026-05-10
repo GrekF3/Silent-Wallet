@@ -1,5 +1,6 @@
 "use client";
-import { useState, useMemo } from "react";
+
+import { useMemo, useState } from "react";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
 import { GlassCard }      from "@/components/ui/GlassCard";
 import { GlassButton }    from "@/components/ui/GlassButton";
@@ -7,26 +8,52 @@ import { Icons }          from "@/components/ui/Icon";
 import { Sparkline }      from "@/components/ui/Sparkline";
 import { CryptoIcon }     from "@/components/ui/CryptoIcon";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
-import { useWalletStore } from "@/lib/store";
-import { useChainData }   from "@/lib/useChainData";
-import { formatUSD, formatCrypto, shortenAddress } from "@/lib/utils";
+import { useWalletStore, type AssetInfo } from "@/lib/store";
+import { formatUSD, formatCrypto, shortenAddress, formatDate } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
-import type { AssetInfo } from "@/lib/store";
-import type { EvmToken } from "@/lib/tokens";
-import type { SplToken } from "@/lib/solana";
 
-/* ── Network colours ─────────────────────────────────────────────── */
+type WalletNetwork = "ethereum" | "bitcoin" | "bsc" | "solana";
+type SortMode = "value" | "name";
+
 const NET_BG: Record<string, string> = {
   ethereum: "rgba(98,88,255,0.13)",
   bitcoin:  "rgba(247,147,26,0.13)",
   bsc:      "rgba(240,185,11,0.13)",
   solana:   "rgba(153,69,255,0.13)",
 };
-const NET_LABEL: Record<string, string> = {
-  ethereum: "ETH", bitcoin: "BTC", bsc: "BSC", solana: "SOL",
+
+const NET_LABEL: Record<WalletNetwork, string> = {
+  ethereum: "Ethereum",
+  bitcoin: "Bitcoin",
+  bsc: "BNB Chain",
+  solana: "Solana",
 };
 
-/* ── Skeleton ─────────────────────────────────────────────────────── */
+const NET_SHORT: Record<WalletNetwork, string> = {
+  ethereum: "ETH",
+  bitcoin: "BTC",
+  bsc: "BSC",
+  solana: "SOL",
+};
+
+type DisplayAsset = {
+  id: string;
+  symbol: string;
+  name: string;
+  network: WalletNetwork;
+  balance: number;
+  priceUSD: number;
+  valueUSD: number;
+  change24h: number;
+  change7d: number;
+  spark7d: number[];
+  image: string;
+  kind: "native" | "evm" | "spl";
+  nativeRef?: AssetInfo;
+};
+
+const NETWORKS = Object.keys(NET_LABEL) as WalletNetwork[];
+
 function Bone({ w, h, r = 8 }: { w: number | string; h: number; r?: number }) {
   return (
     <motion.div animate={{ opacity: [0.22, 0.48, 0.22] }} transition={{ duration: 1.8, repeat: Infinity }}
@@ -34,177 +61,407 @@ function Bone({ w, h, r = 8 }: { w: number | string; h: number; r?: number }) {
   );
 }
 
-/* ── Asset row (native) ───────────────────────────────────────────── */
-function NativeRow({ asset }: { asset: AssetInfo }) {
-  const { openAsset } = useWalletStore();
-  const pos = asset.change24h >= 0;
+function assetValue(asset: DisplayAsset) {
+  return asset.balance * asset.priceUSD;
+}
+
+function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
   return (
-    <GlassCard hover onClick={() => openAsset(asset)} style={{ padding: "13px 18px", cursor: "pointer" }}>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      style={{
+        width: 42,
+        height: 24,
+        borderRadius: 999,
+        border: `1px solid ${on ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.10)"}`,
+        background: on ? "rgba(255,255,255,0.20)" : "rgba(255,255,255,0.06)",
+        position: "relative",
+        cursor: "pointer",
+        flexShrink: 0,
+      }}
+    >
+      <motion.span
+        animate={{ x: on ? 18 : 2 }}
+        transition={{ type: "spring", stiffness: 520, damping: 34 }}
+        style={{ position: "absolute", top: 2, left: 0, width: 18, height: 18, borderRadius: "50%", background: "#fff" }}
+      />
+    </button>
+  );
+}
+
+function AssetRow({ asset, privacyMode, onClick }: { asset: DisplayAsset; privacyMode: boolean; onClick: () => void }) {
+  const pos = asset.change24h >= 0;
+  const needsPrice = asset.balance > 0 && asset.priceUSD <= 0;
+  return (
+    <GlassCard hover onClick={onClick} style={{ padding: "12px 16px", cursor: "pointer" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
         <div style={{ width: 42, height: 42, borderRadius: 13, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: NET_BG[asset.network], border: "1px solid rgba(255,255,255,0.09)", borderTop: "1px solid rgba(255,255,255,0.20)", boxShadow: "0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08)" }}>
           <CryptoIcon symbol={asset.symbol} image={asset.image} size={23} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 3 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>{asset.symbol}</span>
-            <span style={{ fontSize: 10, fontWeight: 500, padding: "1px 6px", borderRadius: 5, background: NET_BG[asset.network], color: "rgba(255,255,255,0.45)", border: "1px solid rgba(255,255,255,0.07)" }}>{NET_LABEL[asset.network]}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 3, minWidth: 0 }}>
+            <span style={{ fontSize: 14, fontWeight: 650, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{asset.symbol}</span>
+            <span style={{ fontSize: 10, fontWeight: 550, padding: "1px 6px", borderRadius: 5, background: NET_BG[asset.network], color: "rgba(255,255,255,0.45)", border: "1px solid rgba(255,255,255,0.07)", flexShrink: 0 }}>{NET_SHORT[asset.network]}</span>
           </div>
           <span style={{ fontSize: 11, color: "rgba(255,255,255,0.28)" }}>{formatCrypto(asset.balance, 5)} {asset.symbol}</span>
         </div>
         {asset.spark7d.length > 1 && <Sparkline data={asset.spark7d} width={56} height={26} positive={asset.change7d >= 0} />}
         <div style={{ textAlign: "right", minWidth: 86, flexShrink: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 500, color: "#fff", fontVariantNumeric: "tabular-nums", marginBottom: 3 }}>{formatUSD(asset.balance * asset.priceUSD)}</div>
-          <span style={{ fontSize: 11, fontWeight: 500, color: pos ? "rgba(255,255,255,0.55)" : "rgba(255,100,100,0.75)", fontVariantNumeric: "tabular-nums" }}>{pos ? "+" : ""}{asset.change24h.toFixed(2)}%</span>
-        </div>
-      </div>
-    </GlassCard>
-  );
-}
-
-/* ── Token row (ERC-20 / BEP-20 / SPL) ──────────────────────────── */
-function TokenRow({ token, chain, onClick }: { token: EvmToken | SplToken; chain: string; onClick: () => void }) {
-  const isEvm   = "contract" in token;
-  const symbol  = token.symbol ?? (isEvm ? "?" : (token as SplToken).mint.slice(0, 6));
-  const balance = isEvm ? token.balance : (token as SplToken).amount;
-  const price   = token.priceUSD ?? 0;
-  const change  = token.change24h ?? 0;
-  const image   = isEvm ? (token as EvmToken).image : (token as SplToken).logoURI ?? "";
-  const value   = balance * price;
-  const pos     = change >= 0;
-
-  return (
-    <GlassCard hover onClick={onClick} style={{ padding: "11px 18px", cursor: "pointer" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
-        <div style={{ width: 38, height: 38, borderRadius: 11, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: NET_BG[chain] ?? "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.08)", borderTop: "1px solid rgba(255,255,255,0.16)", boxShadow: "0 2px 6px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.07)" }}>
-          <CryptoIcon symbol={symbol} image={image} size={20} />
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{symbol}</span>
-            <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 4, background: NET_BG[chain] ?? "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.40)", letterSpacing: "0.03em" }}>{NET_LABEL[chain] ?? chain.toUpperCase()}</span>
+          <div style={{ fontSize: 14, fontWeight: 550, color: "#fff", fontVariantNumeric: "tabular-nums", marginBottom: 3 }}>
+            {privacyMode ? "••••" : needsPrice ? "Pricing..." : formatUSD(asset.valueUSD)}
           </div>
-          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.26)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block", maxWidth: 180 }}>
-            {formatCrypto(balance, 4)} {symbol}
+          <span style={{ fontSize: 11, fontWeight: 500, color: pos ? "rgba(255,255,255,0.55)" : "rgba(255,100,100,0.75)", fontVariantNumeric: "tabular-nums" }}>
+            {pos ? "+" : ""}{asset.change24h.toFixed(2)}%
           </span>
         </div>
-        <div style={{ textAlign: "right", minWidth: 80, flexShrink: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: "#fff", fontVariantNumeric: "tabular-nums", marginBottom: 3 }}>
-            {value > 0.001 ? formatUSD(value) : "—"}
-          </div>
-          {change !== 0
-            ? <span style={{ fontSize: 10, fontWeight: 500, color: pos ? "rgba(255,255,255,0.50)" : "rgba(255,100,100,0.70)", fontVariantNumeric: "tabular-nums" }}>{pos ? "+" : ""}{change.toFixed(2)}%</span>
-            : price > 0
-              ? <span style={{ fontSize: 10, color: "rgba(255,255,255,0.28)", fontVariantNumeric: "tabular-nums" }}>${price.toFixed(4)}</span>
-              : <span style={{ fontSize: 10, color: "rgba(255,255,255,0.18)" }}>no price</span>
-          }
-        </div>
       </div>
     </GlassCard>
   );
 }
 
-/* ── Dashboard ───────────────────────────────────────────────────── */
+function NetworkFilter({
+  selected,
+  onApply,
+}: {
+  selected: WalletNetwork[];
+  onApply: (networks: WalletNetwork[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<WalletNetwork[]>(selected);
+  const [query, setQuery] = useState("");
+  const filtered = NETWORKS.filter((network) => NET_LABEL[network].toLowerCase().includes(query.toLowerCase()) || NET_SHORT[network].toLowerCase().includes(query.toLowerCase()));
+
+  const toggle = (network: WalletNetwork) => {
+    setDraft((prev) => prev.includes(network) ? prev.filter((n) => n !== network) : [...prev, network]);
+  };
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => { setOpen((v) => !v); setDraft(selected); }}
+        style={{ width: 42, height: 42, borderRadius: 14, border: "1px solid rgba(255,255,255,0.10)", borderTop: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.58)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+        title="Filter networks"
+      >
+        <Icons.filter size={15} />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+            transition={{ duration: 0.15 }}
+            className="dashboard-popover"
+          >
+            <div className="popover-title">
+              <Icons.filter size={14} /> Networks
+            </div>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search networks"
+              className="popover-input"
+            />
+            <button type="button" className="popover-row" onClick={() => setDraft(NETWORKS)}>
+              <Icons.check size={14} /> All networks
+            </button>
+            {filtered.map((network) => {
+              const active = draft.includes(network);
+              return (
+                <button key={network} type="button" className="popover-row" onClick={() => toggle(network)}>
+                  <span style={{ width: 18, height: 18, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${active ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.14)"}`, background: active ? "rgba(255,255,255,0.16)" : "transparent" }}>
+                    {active && <Icons.check size={11} />}
+                  </span>
+                  {NET_LABEL[network]}
+                </button>
+              );
+            })}
+            <div className="popover-actions">
+              <button type="button" onClick={() => { setDraft(selected); setOpen(false); }}>Cancel</button>
+              <button type="button" onClick={() => { onApply(draft.length ? draft : NETWORKS); setOpen(false); }}>Apply</button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function MoreMenu({
+  sortMode,
+  setSortMode,
+  hideZero,
+  setHideZero,
+  openManage,
+}: {
+  sortMode: SortMode;
+  setSortMode: (mode: SortMode) => void;
+  hideZero: boolean;
+  setHideZero: (v: boolean) => void;
+  openManage: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        style={{ width: 42, height: 42, borderRadius: 14, border: "1px solid rgba(255,255,255,0.10)", borderTop: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.58)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+        title="More actions"
+      >
+        <Icons.more size={16} />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+            transition={{ duration: 0.15 }}
+            className="dashboard-popover dashboard-popover-right"
+          >
+            <div className="popover-title"><Icons.more size={14} /> Actions</div>
+            <button type="button" className="popover-row" onClick={() => setSortMode(sortMode === "value" ? "name" : "value")}>
+              <Icons.sort size={14} /> Sort by {sortMode === "value" ? "name" : "balance"}
+            </button>
+            <button type="button" className="popover-row" onClick={() => { setOpen(false); openManage(); }}>
+              <Icons.coins size={14} /> Manage coins
+            </button>
+            <button type="button" className="popover-row" onClick={() => setHideZero(!hideZero)}>
+              {hideZero ? <Icons.eyeOff size={14} /> : <Icons.eye size={14} />} Hide 0 balances
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function ManageCoinsModal({ assets, onClose }: { assets: DisplayAsset[]; onClose: () => void }) {
+  const { hiddenAssetIds, toggleHiddenAsset } = useWalletStore();
+  const [query, setQuery] = useState("");
+  const filtered = assets.filter((asset) => `${asset.symbol} ${asset.name} ${NET_LABEL[asset.network]}`.toLowerCase().includes(query.toLowerCase()));
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, zIndex: 160, display: "flex", alignItems: "center", justifyContent: "center", padding: 18, background: "rgba(0,0,0,0.66)", backdropFilter: "blur(10px)" }}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 12, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 8, scale: 0.98 }}
+        onClick={(e) => e.stopPropagation()}
+        style={{ width: "min(520px, 100%)" }}
+      >
+        <GlassCard elevated style={{ padding: 18 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+            <div style={{ width: 38, height: 38, borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)" }}>
+              <Icons.coins size={17} color="rgba(255,255,255,0.62)" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 17, fontWeight: 650, color: "#fff" }}>Manage coins</div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.32)" }}>Disabled coins are not shown in the wallet</div>
+            </div>
+            <button type="button" onClick={onClose} style={{ width: 34, height: 34, borderRadius: 11, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+              <Icons.x size={15} color="rgba(255,255,255,0.52)" />
+            </button>
+          </div>
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search assets" className="popover-input" style={{ marginBottom: 10 }} />
+          <div style={{ maxHeight: "min(420px, 58vh)", overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
+            {filtered.map((asset) => {
+              const active = !hiddenAssetIds.includes(asset.id);
+              return (
+                <div key={asset.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 13, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                  <CryptoIcon symbol={asset.symbol} image={asset.image} size={24} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 650, color: "#fff" }}>{asset.symbol}</div>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.30)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{NET_LABEL[asset.network]} · {formatCrypto(asset.balance, 5)}</div>
+                  </div>
+                  <Toggle on={active} onClick={() => toggleHiddenAsset(asset.id)} />
+                </div>
+              );
+            })}
+          </div>
+        </GlassCard>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 const stagger: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.06, delayChildren: 0.03 } } };
 const up: Variants = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, transition: { duration: 0.30 } } };
 
 export function Dashboard() {
-  const { assets, evmTokens, splTokens, addresses, loading, initialLoaded, setView } = useWalletStore();
+  const {
+    assets, evmTokens, splTokens, addresses, loading, initialLoaded, loadingState, lastUpdated, setView, openAsset,
+    privacyMode, setPrivacyMode, hideZeroBalances, setHideZeroBalances, hiddenAssetIds,
+  } = useWalletStore();
   const toast = useToast();
-  useChainData();
-
   const [search, setSearch] = useState("");
+  const [networks, setNetworks] = useState<WalletNetwork[]>(NETWORKS);
+  const [sortMode, setSortMode] = useState<SortMode>("value");
+  const [manageOpen, setManageOpen] = useState(false);
 
-  const addr  = addresses?.ethereum ?? null;
-  const total = assets.reduce((s, a) => s + a.balance * a.priceUSD, 0)
-    + evmTokens.reduce((s, t) => s + t.valueUSD, 0)
-    + splTokens.reduce((s, t) => s + t.amount * (t.priceUSD ?? 0), 0);
-  const totalChange = assets.reduce((s, a) => s + a.balance * a.priceUSD * (a.change24h / 100), 0);
-  const pct   = total > 0 ? (totalChange / (total - totalChange)) * 100 : 0;
-  const pos   = pct >= 0;
+  const allAssets = useMemo<DisplayAsset[]>(() => [
+    ...assets.map((asset) => ({
+      id: `native:${asset.id}`,
+      symbol: asset.symbol,
+      name: asset.name,
+      network: asset.network,
+      balance: asset.balance,
+      priceUSD: asset.priceUSD,
+      valueUSD: asset.balance * asset.priceUSD,
+      change24h: asset.change24h,
+      change7d: asset.change7d,
+      spark7d: asset.spark7d,
+      image: asset.image,
+      kind: "native" as const,
+      nativeRef: asset,
+    })),
+    ...evmTokens.map((token) => ({
+      id: `evm:${token.chain}:${token.contract.toLowerCase()}`,
+      symbol: token.symbol,
+      name: token.name,
+      network: token.chain === "bsc" ? "bsc" as const : "ethereum" as const,
+      balance: token.balance,
+      priceUSD: token.priceUSD,
+      valueUSD: token.valueUSD,
+      change24h: token.change24h,
+      change7d: 0,
+      spark7d: [],
+      image: token.image,
+      kind: "evm" as const,
+    })),
+    ...splTokens.map((token) => ({
+      id: `spl:${token.mint}`,
+      symbol: token.symbol ?? token.mint.slice(0, 6),
+      name: token.name ?? token.mint,
+      network: "solana" as const,
+      balance: token.amount,
+      priceUSD: token.priceUSD ?? 0,
+      valueUSD: token.amount * (token.priceUSD ?? 0),
+      change24h: token.change24h ?? 0,
+      change7d: 0,
+      spark7d: [],
+      image: token.logoURI ?? "",
+      kind: "spl" as const,
+    })),
+  ], [assets, evmTokens, splTokens]);
 
+  const activeAssets = useMemo(() => allAssets.filter((asset) => !hiddenAssetIds.includes(asset.id)), [allAssets, hiddenAssetIds]);
+  const total = activeAssets.reduce((sum, asset) => sum + asset.valueUSD, 0);
+  const totalChange = activeAssets.reduce((sum, asset) => sum + asset.valueUSD * (asset.change24h / 100), 0);
+  const pct = total > 0 ? (totalChange / (total - totalChange || total)) * 100 : 0;
+  const pos = pct >= 0;
   const q = search.toLowerCase().trim();
 
-  const filteredNative = useMemo(() => assets.filter((a) =>
-    !q || a.symbol.toLowerCase().includes(q) || a.name.toLowerCase().includes(q)
-  ), [assets, q]);
-
-  const filteredEvm = useMemo(() => evmTokens.filter((t) =>
-    !q || (t.symbol?.toLowerCase() ?? "").includes(q) || t.name.toLowerCase().includes(q) || t.contract.toLowerCase().includes(q)
-  ), [evmTokens, q]);
-
-  const filteredSpl = useMemo(() => splTokens.filter((t) =>
-    !q || (t.symbol?.toLowerCase() ?? "").includes(q) || (t.name?.toLowerCase() ?? "").includes(q) || t.mint.toLowerCase().includes(q)
-  ), [splTokens, q]);
+  const visibleAssets = useMemo(() => activeAssets
+    .filter((asset) => networks.includes(asset.network))
+    .filter((asset) => !hideZeroBalances || asset.balance > 0)
+    .filter((asset) => !q || asset.symbol.toLowerCase().includes(q) || asset.name.toLowerCase().includes(q))
+    .sort((a, b) => sortMode === "value" ? assetValue(b) - assetValue(a) : a.symbol.localeCompare(b.symbol)),
+  [activeAssets, hideZeroBalances, networks, q, sortMode]);
 
   const showSkeleton = !initialLoaded && loading;
-  const totalItems = filteredNative.length + filteredEvm.length + filteredSpl.length;
+  const partialErrors = Object.entries(loadingState)
+    .filter(([, state]) => state.status === "partial" || state.status === "error")
+    .map(([source]) => source);
+  const addr = addresses?.ethereum ?? null;
 
   return (
-    <motion.div variants={stagger} initial="hidden" animate="show"
+    <motion.div className="view-shell" variants={stagger} initial="hidden" animate="show"
       style={{ padding: "32px 28px", display: "flex", flexDirection: "column", gap: 24, maxWidth: 760 }}>
+      <AnimatePresence>
+        {manageOpen && <ManageCoinsModal assets={[...allAssets].sort((a, b) => assetValue(b) - assetValue(a))} onClose={() => setManageOpen(false)} />}
+      </AnimatePresence>
 
-      {/* ── Balance header ──────────────────────────────────────── */}
       <motion.div variants={up}>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
-          <div>
-            <span style={{ display: "block", fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.28)", marginBottom: 12 }}>
-              Total Portfolio
-            </span>
-            {showSkeleton ? <Bone w={200} h={44} r={10} /> : (
-              <AnimatedNumber value={total} format={formatUSD}
-                style={{ fontSize: 44, fontWeight: 300, letterSpacing: "-0.025em", color: "#fff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }} />
-            )}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
-              {showSkeleton ? <Bone w={140} h={22} r={11} /> : (
-                <>
-                  <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: 18, background: pos ? "rgba(255,255,255,0.05)" : "rgba(255,60,60,0.07)", border: `1px solid ${pos ? "rgba(255,255,255,0.08)" : "rgba(255,80,80,0.15)"}` }}>
-                    {pos ? <Icons.trendUp size={11} color="rgba(255,255,255,0.60)" /> : <Icons.trendDown size={11} color="rgba(255,100,100,0.80)" />}
-                    <span style={{ fontSize: 11, fontWeight: 500, color: pos ? "rgba(255,255,255,0.65)" : "rgba(255,100,100,0.80)", fontVariantNumeric: "tabular-nums" }}>
-                      {pos ? "+" : ""}{formatUSD(totalChange)} · {pos ? "+" : ""}{pct.toFixed(2)}% 24h
-                    </span>
-                  </div>
-                  {addr && (
-                    <button onClick={() => { navigator.clipboard.writeText(addr); toast("Address copied"); }}
-                      style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontFamily: "monospace", color: "rgba(255,255,255,0.26)", cursor: "pointer", background: "none", border: "none", padding: 0 }}>
-                      {shortenAddress(addr, 4)} <Icons.copy size={10} color="rgba(255,255,255,0.24)" />
-                    </button>
-                  )}
-                </>
+        <div className="dashboard-hero-row" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
+              <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.28)" }}>Total Portfolio</span>
+              <button type="button" onClick={() => setPrivacyMode(!privacyMode)} title={privacyMode ? "Show balance" : "Hide balance"} style={{ width: 28, height: 28, borderRadius: 9, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.045)", color: "rgba(255,255,255,0.46)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                {privacyMode ? <Icons.eyeOff size={14} /> : <Icons.eye size={14} />}
+              </button>
+            </div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10, minHeight: 48 }}>
+              <span style={{ fontSize: 14, color: "rgba(255,255,255,0.34)", fontWeight: 600 }}>≈</span>
+              {showSkeleton ? <Bone w={200} h={44} r={10} /> : privacyMode ? (
+                <span style={{ fontSize: "clamp(34px, 10vw, 44px)", fontWeight: 300, color: "#fff", lineHeight: 1 }}>••••••</span>
+              ) : (
+                <AnimatedNumber value={total} format={formatUSD}
+                  style={{ fontSize: "clamp(34px, 10vw, 44px)", fontWeight: 300, letterSpacing: "-0.025em", color: "#fff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }} />
               )}
             </div>
+            <div style={{ marginTop: 5, fontSize: 11, color: "rgba(255,255,255,0.28)" }}>Approximately</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+              {!showSkeleton && !privacyMode && (
+                <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: 18, background: pos ? "rgba(255,255,255,0.05)" : "rgba(255,60,60,0.07)", border: `1px solid ${pos ? "rgba(255,255,255,0.08)" : "rgba(255,80,80,0.15)"}` }}>
+                  {pos ? <Icons.trendUp size={11} color="rgba(255,255,255,0.60)" /> : <Icons.trendDown size={11} color="rgba(255,100,100,0.80)" />}
+                  <span style={{ fontSize: 11, fontWeight: 500, color: pos ? "rgba(255,255,255,0.65)" : "rgba(255,100,100,0.80)", fontVariantNumeric: "tabular-nums" }}>
+                    {pos ? "+" : ""}{formatUSD(totalChange)} · {pos ? "+" : ""}{pct.toFixed(2)}% 24h
+                  </span>
+                </div>
+              )}
+              {addr && (
+                <button onClick={() => { navigator.clipboard.writeText(addr); toast("Address copied"); }}
+                  style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontFamily: "monospace", color: "rgba(255,255,255,0.26)", cursor: "pointer", background: "none", border: "none", padding: 0 }}>
+                  {shortenAddress(addr, 4)} <Icons.copy size={10} color="rgba(255,255,255,0.24)" />
+                </button>
+              )}
+            </div>
+            {!showSkeleton && (
+              <div style={{ marginTop: 8, fontSize: 11, color: "rgba(255,255,255,0.20)" }}>
+                {partialErrors.length > 0
+                  ? `Partial data: ${partialErrors.join(", ")}`
+                  : lastUpdated
+                    ? `Updated ${formatDate(new Date(lastUpdated))}`
+                    : "Indexing wallet"}
+              </div>
+            )}
           </div>
-          <div style={{ display: "flex", gap: 8, paddingTop: 4, flexShrink: 0 }}>
+          <div className="dashboard-actions" style={{ display: "flex", gap: 8, paddingTop: 4, flexShrink: 0 }}>
             <GlassButton variant="primary" size="md" onClick={() => setView("transfer")}><Icons.send size={13} color="#000" /> Send</GlassButton>
             <GlassButton variant="default" size="md" onClick={() => setView("transfer")}><Icons.receive size={13} /> Receive</GlassButton>
           </div>
         </div>
       </motion.div>
 
-      {/* ── Search ────────────────────────────────────────────── */}
       <motion.div variants={up}>
-        <div style={{ position: "relative" }}>
-          <div style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
-            <Icons.search size={14} color="rgba(255,255,255,0.28)" />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 8, alignItems: "center" }}>
+          <div style={{ position: "relative", minWidth: 0 }}>
+            <div style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
+              <Icons.search size={14} color="rgba(255,255,255,0.28)" />
+            </div>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search assets"
+              style={{ width: "100%", height: 42, paddingLeft: 38, paddingRight: 14, borderRadius: 14, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", borderTop: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontSize: 13, fontFamily: "inherit", outline: "none", boxShadow: "inset 0 1px 4px rgba(0,0,0,0.2)", boxSizing: "border-box" }}
+            />
+            {search && (
+              <button type="button" onClick={() => setSearch("")} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.30)", display: "flex", padding: 2 }}>
+                <Icons.x size={13} color="rgba(255,255,255,0.30)" />
+              </button>
+            )}
           </div>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search assets, tokens, contracts…"
-            style={{ width: "100%", height: 42, paddingLeft: 38, paddingRight: 14, borderRadius: 14, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", borderTop: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontSize: 13, fontFamily: "inherit", outline: "none", boxShadow: "inset 0 1px 4px rgba(0,0,0,0.2)", boxSizing: "border-box" }}
-          />
-          {search && (
-            <button onClick={() => setSearch("")} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.30)", display: "flex", padding: 2 }}>
-              <Icons.x size={13} color="rgba(255,255,255,0.30)" />
-            </button>
-          )}
+          <NetworkFilter selected={networks} onApply={setNetworks} />
+          <MoreMenu sortMode={sortMode} setSortMode={setSortMode} hideZero={hideZeroBalances} setHideZero={setHideZeroBalances} openManage={() => setManageOpen(true)} />
         </div>
       </motion.div>
 
-      {/* ── Asset list ─────────────────────────────────────────── */}
       <motion.div variants={up}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
           <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.28)" }}>
-            Assets {totalItems > 0 && `· ${totalItems}`}
+            Assets {visibleAssets.length > 0 && `· ${visibleAssets.length}`}
           </span>
           <button onClick={() => setView("history")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "rgba(255,255,255,0.28)", cursor: "pointer", background: "none", border: "none", fontFamily: "inherit" }}>
             Activity <Icons.chevronR size={12} color="rgba(255,255,255,0.24)" />
@@ -230,51 +487,20 @@ export function Dashboard() {
             </motion.div>
           ) : (
             <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              {/* Native assets */}
-              {filteredNative.map((a, i) => (
-                <motion.div key={a.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04, duration: 0.25 }}>
-                  <NativeRow asset={a} />
+              {visibleAssets.map((asset, i) => (
+                <motion.div key={asset.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.025, duration: 0.20 }}>
+                  <AssetRow
+                    asset={asset}
+                    privacyMode={privacyMode}
+                    onClick={() => asset.nativeRef ? openAsset(asset.nativeRef) : setView("transfer")}
+                  />
                 </motion.div>
               ))}
-
-              {/* ERC-20 / BEP-20 tokens */}
-              {filteredEvm.length > 0 && (
-                <>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "8px 2px 4px" }}>
-                    <div style={{ height: 1, flex: 1, background: "rgba(255,255,255,0.06)" }} />
-                    <span style={{ fontSize: 10, color: "rgba(255,255,255,0.22)", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", whiteSpace: "nowrap" }}>Tokens · {filteredEvm.length}</span>
-                    <div style={{ height: 1, flex: 1, background: "rgba(255,255,255,0.06)" }} />
-                  </div>
-                  {filteredEvm.map((t, i) => (
-                    <motion.div key={t.contract} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 + i * 0.03, duration: 0.22 }}>
-                      <TokenRow token={t} chain={t.chain} onClick={() => setView("transfer")} />
-                    </motion.div>
-                  ))}
-                </>
-              )}
-
-              {/* Solana SPL tokens */}
-              {filteredSpl.length > 0 && (
-                <>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "8px 2px 4px" }}>
-                    <div style={{ height: 1, flex: 1, background: "rgba(255,255,255,0.06)" }} />
-                    <span style={{ fontSize: 10, color: "rgba(255,255,255,0.22)", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", whiteSpace: "nowrap" }}>Solana Tokens · {filteredSpl.length}</span>
-                    <div style={{ height: 1, flex: 1, background: "rgba(255,255,255,0.06)" }} />
-                  </div>
-                  {filteredSpl.map((t, i) => (
-                    <motion.div key={t.mint} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.15 + i * 0.03, duration: 0.22 }}>
-                      <TokenRow token={t} chain="solana" onClick={() => setView("transfer")} />
-                    </motion.div>
-                  ))}
-                </>
-              )}
-
-              {/* Empty */}
-              {totalItems === 0 && !loading && (
+              {visibleAssets.length === 0 && !loading && (
                 <div style={{ textAlign: "center", padding: "48px 0", color: "rgba(255,255,255,0.20)" }}>
                   <Icons.search size={28} color="rgba(255,255,255,0.12)" />
                   <div style={{ marginTop: 10, fontSize: 13 }}>
-                    {search ? `No results for "${search}"` : "No assets found"}
+                    {search ? `No results for "${search}"` : "No balances indexed yet"}
                   </div>
                 </div>
               )}

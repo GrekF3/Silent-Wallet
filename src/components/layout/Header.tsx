@@ -1,6 +1,7 @@
 "use client";
+
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useWalletStore, type View } from "@/lib/store";
 import { Icons } from "@/components/ui/Icon";
 import { shortenAddress } from "@/lib/utils";
@@ -14,15 +15,28 @@ const NAV: NavItem[] = [
   { id: "settings",  label: "Settings"  },
 ];
 
+const ADDRESS_LABELS = {
+  ethereum: "Ethereum",
+  bsc: "BNB Chain",
+  bitcoin: "Bitcoin",
+  solana: "Solana",
+} as const;
+
 export function Header() {
-  const { view, setView, addresses, network, setNetwork, clearSession } = useWalletStore();
-  const toast   = useToast();
-  const addr    = addresses?.ethereum ?? "";
-  const isTest  = network === "testnet";
+  const { view, setView, addresses } = useWalletStore();
+  const [open, setOpen] = useState(false);
+  const toast = useToast();
   const activeNav = (view === "asset" ? "dashboard" : view) as View;
+  const entries = addresses ? (Object.entries(ADDRESS_LABELS) as [keyof typeof ADDRESS_LABELS, string][]) : [];
+
+  const copyAddress = async (address: string, label: string) => {
+    await navigator.clipboard.writeText(address);
+    toast(`${label} address copied`);
+    setOpen(false);
+  };
 
   return (
-    <header style={{
+    <header className="wallet-topbar" style={{
       position:       "sticky",
       top:            0,
       zIndex:         50,
@@ -30,65 +44,50 @@ export function Header() {
       alignItems:     "center",
       height:         56,
       padding:        "0 20px",
-      gap:            8,
-      background:     "rgba(6,6,6,0.85)",
+      gap:            14,
+      background:     "rgba(6,6,6,0.82)",
       backdropFilter: "blur(48px) saturate(180%)",
       WebkitBackdropFilter: "blur(48px) saturate(180%)",
       borderBottom:   "1px solid rgba(255,255,255,0.07)",
-      boxShadow:      "0 1px 0 rgba(255,255,255,0.04), 0 4px 24px rgba(0,0,0,0.4)",
+      boxShadow:      "0 1px 0 rgba(255,255,255,0.04), 0 10px 30px rgba(0,0,0,0.28)",
     }}>
-      {/* Logo */}
       <button
         onClick={() => setView("dashboard")}
-        style={{ display:"flex", alignItems:"center", gap:9, cursor:"pointer", background:"none", border:"none", flexShrink:0, padding:"0 4px 0 0" }}
+        className="topbar-brand"
+        style={{ display: "flex", alignItems: "center", cursor: "pointer", background: "none", border: "none", flexShrink: 0, padding: 0 }}
       >
-        <div style={{
-          width:36, height:36, borderRadius:11, background:"#fff", flexShrink:0,
-          display:"flex", alignItems:"center", justifyContent:"center",
-          boxShadow:"0 2px 10px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.9)",
-        }}>
-          <span style={{ color:"#000", fontWeight:800, fontSize:15, letterSpacing:"-0.04em" }}>S</span>
-        </div>
-        <span style={{ fontSize:15, fontWeight:600, color:"rgba(255,255,255,0.85)", letterSpacing:"-0.02em" }}>
-          Silent
-        </span>
+        <span style={{ fontSize: 16, fontWeight: 650, color: "rgba(255,255,255,0.88)", letterSpacing: 0 }}>Silent</span>
       </button>
 
-      {/* Divider */}
-      <div style={{ width:1, height:22, background:"rgba(255,255,255,0.10)", margin:"0 8px", flexShrink:0 }} />
-
-      {/* Nav */}
-      <nav style={{ display:"flex", alignItems:"center", gap:2, flex:1 }}>
+      <nav className="desktop-nav" style={{ display: "flex", alignItems: "center", gap: 2, flex: 1 }}>
         {NAV.map((item) => {
           const active = activeNav === item.id;
           return (
-            <div key={item.id} style={{ position:"relative" }}>
+            <div key={item.id} style={{ position: "relative" }}>
               {active && (
                 <motion.div
                   layoutId="header-pill"
-                  transition={{ type:"spring", stiffness:400, damping:36 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 36 }}
                   style={{
-                    position:"absolute", inset:0, borderRadius:9,
-                    background:"rgba(255,255,255,0.09)",
-                    border:"1px solid rgba(255,255,255,0.12)",
-                    borderTop:"1px solid rgba(255,255,255,0.20)",
-                    boxShadow:"inset 0 1px 0 rgba(255,255,255,0.08)",
+                    position: "absolute", inset: 0, borderRadius: 10,
+                    background: "rgba(255,255,255,0.07)",
+                    border: "1px solid rgba(255,255,255,0.11)",
+                    borderTop: "1px solid rgba(255,255,255,0.18)",
+                    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)",
                   }}
                 />
               )}
               <button
                 onClick={() => setView(item.id)}
                 style={{
-                  position:"relative", zIndex:1,
-                  padding:"6px 13px", borderRadius:9,
-                  border:"none", background:"transparent", cursor:"pointer",
-                  fontSize:13, fontWeight:500, fontFamily:"inherit",
-                  color: active ? "#fff" : "rgba(255,255,255,0.38)",
-                  transition:"color 0.15s",
-                  whiteSpace:"nowrap",
+                  position: "relative", zIndex: 1,
+                  padding: "6px 13px", borderRadius: 10,
+                  border: "none", background: "transparent", cursor: "pointer",
+                  fontSize: 13, fontWeight: 500, fontFamily: "inherit",
+                  color: active ? "#fff" : "rgba(255,255,255,0.36)",
+                  transition: "color 0.15s",
+                  whiteSpace: "nowrap",
                 }}
-                onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.70)"; }}
-                onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.38)"; }}
               >
                 {item.label}
               </button>
@@ -97,61 +96,92 @@ export function Header() {
         })}
       </nav>
 
-      {/* Right side */}
-      <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
-
-        {/* Testnet toggle */}
-        <button
-          onClick={() => { setNetwork(isTest ? "mainnet" : "testnet"); toast(isTest ? "Switched to Mainnet" : "Switched to Testnet"); }}
-          style={{
-            display:"flex", alignItems:"center", gap:5,
-            padding:"4px 10px", borderRadius:8, cursor:"pointer",
-            fontFamily:"inherit", fontSize:11, fontWeight:600,
-            letterSpacing:"0.04em", textTransform:"uppercase",
-            border:`1px solid ${isTest ? "rgba(251,191,36,0.30)" : "rgba(255,255,255,0.10)"}`,
-            background: isTest ? "rgba(251,191,36,0.08)" : "rgba(255,255,255,0.05)",
-            color: isTest ? "rgba(251,191,36,0.85)" : "rgba(255,255,255,0.30)",
-            transition:"all 0.15s",
-          }}
-        >
-          <div style={{ width:5, height:5, borderRadius:"50%", background: isTest ? "rgba(251,191,36,0.85)" : "rgba(120,220,90,0.85)" }} />
-          {isTest ? "Testnet" : "Mainnet"}
-        </button>
-
-        {/* Address */}
-        {addr && (
+      {addresses && (
+        <div className="topbar-actions" style={{ position: "relative", marginLeft: "auto", flexShrink: 0 }}>
           <button
-            onClick={() => { navigator.clipboard.writeText(addr); toast("Address copied"); }}
+            className="topbar-address"
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-label="Wallet addresses"
+            aria-expanded={open}
             style={{
-              display:"flex", alignItems:"center", gap:6, padding:"5px 11px", borderRadius:9,
-              cursor:"pointer", fontFamily:"monospace", fontSize:12,
-              background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.09)",
-              color:"rgba(255,255,255,0.40)", transition:"color 0.15s",
+              width: 36, height: 36, borderRadius: 12, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              background: open ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.055)",
+              border: "1px solid rgba(255,255,255,0.10)",
+              borderTop: "1px solid rgba(255,255,255,0.18)",
+              color: "rgba(255,255,255,0.58)",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)",
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.70)")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.40)")}
           >
-            <Icons.wallet size={13} />
-            {shortenAddress(addr, 4)}
+            <Icons.wallet size={16} />
           </button>
-        )}
 
-        {/* Lock */}
-        <button
-          onClick={() => clearSession()}
-          title="Lock wallet"
-          style={{
-            width:34, height:34, borderRadius:10, cursor:"pointer",
-            display:"flex", alignItems:"center", justifyContent:"center",
-            background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.09)",
-            color:"rgba(255,255,255,0.28)", transition:"all 0.15s",
-          }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "#fff"; (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.09)"; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.28)"; (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)"; }}
-        >
-          <Icons.lock size={15} />
-        </button>
-      </div>
+          <AnimatePresence>
+            {open && (
+              <motion.div
+                initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                transition={{ duration: 0.15 }}
+                className="topbar-popover"
+                style={{
+                  position: "absolute",
+                  right: 0,
+                  top: "calc(100% + 10px)",
+                  width: "min(340px, calc(100vw - 24px))",
+                  borderRadius: 16,
+                  background: "rgba(12,12,12,0.97)",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  borderTop: "1px solid rgba(255,255,255,0.20)",
+                  boxShadow: "0 18px 56px rgba(0,0,0,0.72), inset 0 1px 0 rgba(255,255,255,0.08)",
+                  backdropFilter: "blur(40px)",
+                  overflow: "hidden",
+                }}
+              >
+                <div style={{ padding: "12px 14px 10px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div style={{ fontSize: 12, fontWeight: 650, color: "#fff" }}>Wallet addresses</div>
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.30)", marginTop: 2 }}>Copy an address for a specific network</div>
+                </div>
+                {entries.map(([key, label]) => {
+                  const value = addresses[key];
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => copyAddress(value, label)}
+                      style={{
+                        width: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "12px 14px",
+                        background: "transparent",
+                        border: "none",
+                        borderBottom: "1px solid rgba(255,255,255,0.05)",
+                        color: "#fff",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        textAlign: "left",
+                      }}
+                    >
+                      <span style={{ width: 34, height: 34, borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.055)", border: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
+                        <Icons.copy size={14} color="rgba(255,255,255,0.44)" />
+                      </span>
+                      <span style={{ minWidth: 0, flex: 1 }}>
+                        <span style={{ display: "block", fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.86)" }}>{label}</span>
+                        <span style={{ display: "block", marginTop: 2, fontFamily: "monospace", fontSize: 11, color: "rgba(255,255,255,0.34)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {shortenAddress(value, 7)}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
     </header>
   );
 }

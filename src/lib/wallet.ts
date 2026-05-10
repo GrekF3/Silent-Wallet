@@ -45,3 +45,13 @@ export function derivePrivateKey(mnemonic: string): Uint8Array {
   const ethWallet = HDNodeWallet.fromPhrase(mnemonic.trim(), undefined, "m/44'/60'/0'/0/0");
   return Buffer.from(ethWallet.privateKey.slice(2), "hex");
 }
+
+export function deriveBitcoinKeypair(mnemonic: string): { privateKey: Uint8Array; publicKey: Uint8Array; address: string } {
+  const seed = bip39.mnemonicToSeedSync(mnemonic.trim());
+  const master = HDKey.fromMasterSeed(seed);
+  const key = master.derive(BTC_PATH);
+  const privateKey = key.privateKey;
+  const publicKey = key.publicKey;
+  if (!privateKey || !publicKey) throw new Error("Failed to derive Bitcoin key");
+  return { privateKey, publicKey, address: p2wpkh(publicKey, btc.NETWORK).address! };
+}

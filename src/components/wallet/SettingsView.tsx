@@ -69,7 +69,7 @@ function PhraseModal({ phrase, onClose }: { phrase: string; onClose: () => void 
         {/* Blur overlay until revealed */}
         <div style={{ position: "relative" }}>
           <div style={{
-            display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8,
+            display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(112px, 1fr))", gap: 8,
             filter: show ? "none" : "blur(10px)",
             transition: "filter 0.3s",
             userSelect: show ? "text" : "none",
@@ -159,6 +159,7 @@ export function SettingsView() {
       </AnimatePresence>
 
       <motion.div
+        className="view-shell"
         initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }}
         style={{ padding: "36px 28px", display: "flex", flexDirection: "column", gap: 24, maxWidth: 560 }}
       >
@@ -231,7 +232,7 @@ export function SettingsView() {
           <GlassCard elevated style={{ overflow: "hidden" }}>
             {/* Export phrase */}
             <motion.div
-              whileHover={{ background: "rgba(255,255,255,0.025)" }}
+              whileHover={{ backgroundColor: "rgba(255,255,255,0.025)" }}
               onClick={() => setShowPhrase(true)}
               style={{ display: "flex", alignItems: "center", gap: 13, padding: "14px 18px", cursor: "pointer" }}
             >
@@ -249,7 +250,7 @@ export function SettingsView() {
 
             {/* Reset wallet */}
             <motion.div
-              whileHover={{ background: "rgba(255,60,60,0.04)" }}
+              whileHover={{ backgroundColor: "rgba(255,60,60,0.04)" }}
               onClick={() => setShowReset(true)}
               style={{ display: "flex", alignItems: "center", gap: 13, padding: "14px 18px", cursor: "pointer" }}
             >
@@ -267,7 +268,7 @@ export function SettingsView() {
 
         {/* Lock button */}
         <motion.button
-          whileHover={{ background: "rgba(255,255,255,0.06)" }}
+          whileHover={{ backgroundColor: "rgba(255,255,255,0.06)" }}
           whileTap={{ scale: 0.98 }}
           onClick={handleLock}
           style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "14px", borderRadius: 16, cursor: "pointer", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)", borderTop: "1px solid rgba(255,255,255,0.14)", fontFamily: "inherit", fontSize: 14, fontWeight: 500, color: "rgba(255,255,255,0.50)", transition: "background 0.15s" }}

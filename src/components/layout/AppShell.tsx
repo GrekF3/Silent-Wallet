@@ -3,12 +3,15 @@ import { AnimatePresence, motion, type Variants } from "framer-motion";
 import { useWalletStore } from "@/lib/store";
 import { ToastProvider }       from "@/components/ui/Toast";
 import { Header }              from "./Header";
+import { BottomNav }           from "./BottomNav";
 import { useActivityTracker }  from "@/lib/useActivityTracker";
 import { Dashboard }    from "@/components/wallet/Dashboard";
 import { AssetDetail }  from "@/components/wallet/AssetDetail";
 import { TransferView } from "@/components/wallet/TransferView";
 import { HistoryView }  from "@/components/wallet/HistoryView";
 import { SettingsView } from "@/components/wallet/SettingsView";
+import { AppPreloader } from "@/components/ui/AppPreloader";
+import { useChainData } from "@/lib/useChainData";
 
 const PAGE: Variants = {
   initial: { opacity: 0, y: 8  },
@@ -17,7 +20,8 @@ const PAGE: Variants = {
 };
 
 export function AppShell({ onLock }: { onLock: () => void }) {
-  const { view } = useWalletStore();
+  const { view, addresses, initialLoaded } = useWalletStore();
+  useChainData();
   useActivityTracker(onLock);
 
   const renderView = () => {
@@ -32,7 +36,7 @@ export function AppShell({ onLock }: { onLock: () => void }) {
 
   return (
     <ToastProvider>
-      <div style={{ display:"flex", flexDirection:"column", height:"100vh", width:"100vw", overflow:"hidden", background:"#080808", position:"relative" }}>
+      <div className="app-shell" style={{ display:"flex", flexDirection:"column", height:"100vh", width:"100vw", overflow:"hidden", background:"#080808", position:"relative" }}>
 
         {/* Atmosphere */}
         <div aria-hidden style={{ position:"fixed", inset:0, zIndex:0, pointerEvents:"none",
@@ -48,7 +52,7 @@ export function AppShell({ onLock }: { onLock: () => void }) {
         <Header />
 
         {/* Main */}
-        <main style={{ flex:1, overflowY:"auto", overflowX:"hidden", position:"relative", zIndex:1 }}>
+        <main className="app-main" style={{ flex:1, overflowY:"auto", overflowX:"hidden", position:"relative", zIndex:1 }}>
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={view}
@@ -63,6 +67,10 @@ export function AppShell({ onLock }: { onLock: () => void }) {
             </motion.div>
           </AnimatePresence>
         </main>
+        <BottomNav />
+        <AnimatePresence>
+          {addresses && !initialLoaded && <AppPreloader label="Syncing wallet" />}
+        </AnimatePresence>
       </div>
     </ToastProvider>
   );

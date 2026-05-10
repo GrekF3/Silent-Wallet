@@ -7,6 +7,8 @@ services:
     command: npm run dev
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     volumes:
       # Mount only source — node_modules stays from the image
       - ./src:/app/src

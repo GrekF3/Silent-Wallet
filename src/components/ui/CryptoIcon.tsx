@@ -12,6 +12,11 @@ const FALLBACKS: Record<string, string> = {
   BTC:  "https://coin-images.coingecko.com/coins/images/1/large/bitcoin.png",
   BNB:  "https://coin-images.coingecko.com/coins/images/825/large/bnb-icon2_2x.png",
   USDC: "https://coin-images.coingecko.com/coins/images/6319/large/USDC.png",
+  USDT: "https://coin-images.coingecko.com/coins/images/325/large/Tether.png",
+  "BSC-USD": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/smartchain/assets/0x55d398326f99059fF775485246999027B3197955/logo.png",
+  BUSD: "https://coin-images.coingecko.com/coins/images/9576/large/BUSD.png",
+  DAI:  "https://coin-images.coingecko.com/coins/images/9956/large/Badge_Dai.png",
+  SOL:  "https://coin-images.coingecko.com/coins/images/4128/large/solana.png",
 };
 
 export function CryptoIcon({ symbol, image, size = 28 }: Props) {

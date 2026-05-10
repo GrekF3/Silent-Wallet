@@ -6,11 +6,13 @@ import { GlassButton } from "@/components/ui/GlassButton";
 import { Icons }       from "@/components/ui/Icon";
 import { useWalletStore } from "@/lib/store";
 import { useToast }    from "@/components/ui/Toast";
+import { bitcoinAddressForNetwork } from "@/lib/bitcoin";
 
 const NETWORKS = [
   { id: "ethereum" as const, label: "Ethereum", symbol: "ETH"   },
   { id: "bitcoin"  as const, label: "Bitcoin",  symbol: "BTC"   },
-  { id: "bsc"      as const, label: "BNB Chain",symbol: "BEP20" },
+  { id: "bsc"      as const, label: "BNB Chain",symbol: "BNB"   },
+  { id: "solana"   as const, label: "Solana",   symbol: "SOL"   },
 ];
 
 const LABEL: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.28)", display: "block", marginBottom: 10 };
@@ -36,19 +38,38 @@ function QRGrid({ seed, size = 168 }: { seed: string; size?: number }) {
 }
 
 export function ReceiveView() {
-  const { addresses } = useWalletStore();
+  const { addresses, mnemonic, network: activeNetwork } = useWalletStore();
   const toast = useToast();
   const [netIdx, setNetIdx] = useState(0);
   const network = NETWORKS[netIdx];
+  const btcAddress = addresses
+    ? (mnemonic ? bitcoinAddressForNetwork(mnemonic, activeNetwork) : addresses.bitcoin)
+    : "";
 
   const addressMap: Record<string, string> = {
-    ethereum: addresses?.ethereum ?? "—",
-    bitcoin:  addresses?.bitcoin  ?? "—",
-    bsc:      addresses?.bsc      ?? "—",
+    ethereum: addresses?.ethereum ?? "",
+    bitcoin:  btcAddress,
+    bsc:      addresses?.bsc      ?? "",
+    solana:   addresses?.solana   ?? "",
   };
   const addr = addressMap[network.id];
 
-  const copy = () => { navigator.clipboard.writeText(addr); toast(`${network.symbol} address copied`); };
+  const copy = async () => {
+    if (!addr) return;
+    await navigator.clipboard.writeText(addr);
+    toast(`${network.symbol} address copied`);
+  };
+
+  const share = async () => {
+    if (!addr) return;
+    const text = `${network.label} ${activeNetwork} address: ${addr}`;
+    if (navigator.share) {
+      await navigator.share({ title: "Silent Wallet address", text }).catch(() => undefined);
+      return;
+    }
+    await navigator.clipboard.writeText(addr);
+    toast(`${network.symbol} address copied`);
+  };
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }}
@@ -78,21 +99,21 @@ export function ReceiveView() {
         <div style={{ padding: "24px 24px 28px", display: "flex", flexDirection: "column", alignItems: "center", gap: 22 }}>
           <motion.div key={netIdx} initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.2 }}
             style={{ padding: 16, borderRadius: 18, background: "rgba(255,255,255,0.055)", border: "1px solid rgba(255,255,255,0.10)", borderTop: "1px solid rgba(255,255,255,0.20)", boxShadow: "0 4px 16px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.10)" }}>
-            <QRGrid seed={addr} size={168} />
+            <QRGrid seed={addr || "silent"} size={168} />
           </motion.div>
 
           <div style={{ textAlign: "center", width: "100%" }}>
-            <span style={{ ...LABEL, marginBottom: 8 }}>{network.label} address</span>
+            <span style={{ ...LABEL, marginBottom: 8 }}>{activeNetwork} {network.label} address</span>
             <div style={{ fontSize: 12, fontFamily: "monospace", color: "rgba(255,255,255,0.50)", wordBreak: "break-all", lineHeight: 1.6 }}>
-              {addr}
+              {addr || "Address unavailable"}
             </div>
           </div>
 
           <div style={{ display: "flex", gap: 10, width: "100%" }}>
-            <GlassButton variant="default" size="md" style={{ flex: 1 }} onClick={copy}>
+            <GlassButton variant="default" size="md" style={{ flex: 1 }} onClick={copy} disabled={!addr}>
               <Icons.copy size={13} /> Copy
             </GlassButton>
-            <GlassButton variant="ghost" size="md" style={{ flex: 1 }}>
+            <GlassButton variant="ghost" size="md" style={{ flex: 1 }} onClick={share} disabled={!addr}>
               <Icons.share size={13} /> Share
             </GlassButton>
           </div>

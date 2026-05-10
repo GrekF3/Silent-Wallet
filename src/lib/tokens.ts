@@ -1,4 +1,5 @@
 // ERC-20 / BEP-20 token balance discovery + pricing
+import { rpcUrl, coinGeckoHeaders } from "./config";
 
 export type EvmToken = {
   contract:  string;
@@ -44,11 +45,11 @@ async function fetchEthTokens(address: string): Promise<EvmToken[]> {
 
     // Fetch prices via /coins/markets - much more reliable than token_price endpoint
     const contracts = tokens.slice(0, 30).map((t) => t.contract).join(",");
-    let contractPriceMap: Record<string, { usd: number; change: number }> = {};
+    const contractPriceMap: Record<string, { usd: number; change: number }> = {};
     try {
       const pr = await fetch(
         `https://api.coingecko.com/api/v3/simple/token_price/ethereum?contract_addresses=${contracts}&vs_currencies=usd&include_24hr_change=true`,
-        { signal: AbortSignal.timeout(8_000) }
+        { signal: AbortSignal.timeout(8_000), headers: coinGeckoHeaders() }
       );
       const raw = await pr.json();
       for (const [k, v] of Object.entries(raw as Record<string, { usd?: number; usd_24h_change?: number }>)) {
@@ -98,12 +99,78 @@ const BSC_TOKENS: { contract: string; symbol: string; name: string; decimals: nu
 
 const BALANCE_OF = (addr: string) => "0x70a08231" + addr.slice(2).padStart(64, "0");
 
-async function fetchBscTokens(address: string): Promise<EvmToken[]> {
+type BlockscoutTokenBalance = {
+  token?: {
+    address?: string;
+    symbol?: string;
+    name?: string;
+    decimals?: string;
+    icon_url?: string | null;
+  };
+  value?: string;
+};
+
+function decimalFromRaw(raw: string, decimals: number): number {
+  try {
+    const big = BigInt(raw || "0");
+    const divisor = BigInt(10) ** BigInt(decimals);
+    return Number(big / divisor) + Number(big % divisor) / Math.pow(10, decimals);
+  } catch {
+    return 0;
+  }
+}
+
+async function fetchBscIndexedTokens(address: string): Promise<EvmToken[]> {
+  try {
+    const r = await fetch(`https://bsc.blockscout.com/api/v2/addresses/${address}/token-balances`, {
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!r.ok) return [];
+    const raw = await r.json() as BlockscoutTokenBalance[];
+    const tokens = raw.map((row) => {
+      const token = row.token;
+      const decimals = parseInt(token?.decimals ?? "18", 10) || 18;
+      return {
+        contract: token?.address ?? "",
+        symbol: token?.symbol ?? "TOKEN",
+        name: token?.name ?? "Token",
+        decimals,
+        balance: decimalFromRaw(row.value ?? "0", decimals),
+        priceUSD: 0,
+        valueUSD: 0,
+        change24h: 0,
+        image: token?.icon_url ?? "",
+        chain: "bsc" as const,
+      };
+    }).filter((t) => /^0x[0-9a-fA-F]{40}$/.test(t.contract) && t.balance > 0);
+
+    if (!tokens.length) return [];
+    const contracts = tokens.slice(0, 50).map((t) => t.contract).join(",");
+    let prices: Record<string, { usd?: number; usd_24h_change?: number }> = {};
+    try {
+      const pr = await fetch(
+        `https://api.coingecko.com/api/v3/simple/token_price/binance-smart-chain?contract_addresses=${contracts}&vs_currencies=usd&include_24hr_change=true`,
+        { signal: AbortSignal.timeout(8_000), headers: coinGeckoHeaders() }
+      );
+      prices = await pr.json();
+    } catch { /* keep balances even without prices */ }
+
+    return tokens.map((t) => {
+      const p = prices[t.contract.toLowerCase()];
+      const priceUSD = p?.usd ?? 0;
+      return { ...t, priceUSD, valueUSD: t.balance * priceUSD, change24h: p?.usd_24h_change ?? 0 };
+    }).sort((a, b) => b.valueUSD - a.valueUSD);
+  } catch {
+    return [];
+  }
+}
+
+async function fetchBscKnownTokens(address: string): Promise<EvmToken[]> {
   try {
     // Batch balanceOf calls
     const calls = BSC_TOKENS.map((t) =>
       Promise.race([
-        fetch("https://bsc-dataseed1.binance.org", {
+        fetch(rpcUrl("bsc", "mainnet"), {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_call", params: [{ to: t.contract, data: BALANCE_OF(address) }, "latest"] }),
         }).then((r) => r.json()),
@@ -115,7 +182,7 @@ async function fetchBscTokens(address: string): Promise<EvmToken[]> {
     const results = settled.map((r) => r.status === "fulfilled" ? r.value : { result: "0x0" });
     const withBalance = BSC_TOKENS.map((t, i) => {
       const raw     = (results[i] as { result: string }).result ?? "0x0";
-      const balance = parseInt(raw, 16) / Math.pow(10, t.decimals);
+      const balance = decimalFromRaw(BigInt(raw || "0x0").toString(), t.decimals);
       return { ...t, balance, chain: "bsc" as const };
     }).filter((t) => t.balance > 0.000001);
 
@@ -129,7 +196,7 @@ async function fetchBscTokens(address: string): Promise<EvmToken[]> {
       try {
         const r = await fetch(
           `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${cgIds}&per_page=50`,
-          { signal: AbortSignal.timeout(10_000) }
+          { signal: AbortSignal.timeout(10_000), headers: coinGeckoHeaders() }
         );
         const list = await r.json() as { id: string; current_price: number; price_change_percentage_24h: number; image: string }[];
         for (const c of (list ?? [])) {
@@ -163,12 +230,28 @@ async function fetchBscTokens(address: string): Promise<EvmToken[]> {
 }
 
 // ── Public API ────────────────────────────────────────────────────
-export async function fetchAllEvmTokens(ethAddress: string): Promise<EvmToken[]> {
-  const [eth, bsc] = await Promise.all([
+export async function fetchAllEvmTokensServer(ethAddress: string, bscAddress: string): Promise<EvmToken[]> {
+  const [eth, indexedBsc] = await Promise.all([
     fetchEthTokens(ethAddress),
-    fetchBscTokens(ethAddress),
+    fetchBscIndexedTokens(bscAddress),
   ]);
+  const bsc = indexedBsc.length ? indexedBsc : await fetchBscKnownTokens(bscAddress);
   return [...eth, ...bsc].sort((a, b) => b.valueUSD - a.valueUSD);
+}
+
+export async function fetchAllEvmTokens(ethAddress: string, bscAddress: string): Promise<EvmToken[]> {
+  if (typeof window !== "undefined") {
+    const params = new URLSearchParams({ eth: ethAddress, bsc: bscAddress });
+    const r = await fetch(`/api/tokens?${params.toString()}`, {
+      signal: AbortSignal.timeout(25_000),
+      cache: "no-store",
+    });
+    if (!r.ok) throw new Error(`Token discovery failed: ${r.status}`);
+    const d = await r.json() as { tokens?: EvmToken[] };
+    return d.tokens ?? [];
+  }
+
+  return fetchAllEvmTokensServer(ethAddress, bscAddress);
 }
 
 // ── CoinGecko token search ────────────────────────────────────────

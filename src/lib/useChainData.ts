@@ -1,147 +1,204 @@
 "use client";
-import { useEffect, useCallback, useRef } from "react";
-import { useWalletStore } from "./store";
-import { fetchPrices } from "./prices";
-import { getEthBalance, getBnbBalance, getBtcBalance, getEthTransactions, getBnbTransactions, getBtcTransactions } from "./chains";
-import { getSolBalance, getSplTokens, getSolTransactions } from "./solana";
+
+import { useCallback, useEffect } from "react";
+import { useWalletStore, type AssetInfo } from "./store";
+import { fetchPrices, type Prices } from "./prices";
+import { getBnbBalance, getBtcBalance, getEthBalance } from "./chains";
+import { getSolBalance, getSplTokens } from "./solana";
+import { bitcoinAddressForNetwork } from "./bitcoin";
 import { fetchAllEvmTokens } from "./tokens";
+import { fetchWalletHistory } from "./history";
 import { readCacheAny, writeCache } from "./cache";
-import type { AssetInfo } from "./store";
+import { setWalletRefreshHandler } from "./walletRefresh";
 
-const FETCH_TIMEOUT = 12_000; // 12s per call max
+const FETCH_TIMEOUT = 12_000;
 
-function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
-  ]);
+let activeRefresh = false;
+let hydratedCacheKey = "";
+
+type LoadResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; error: string };
+
+async function loadWithTimeout<T>(promise: Promise<T>, ms: number): Promise<LoadResult<T>> {
+  try {
+    const value = await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Request timed out")), ms)),
+    ]);
+    return { ok: true, value };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Request failed" };
+  }
+}
+
+function emptyPrices(): Prices {
+  return {
+    ETH:  { usd: 0, usd_24h_change: 0, usd_7d_change: 0, image: "", spark7d: [] },
+    BTC:  { usd: 0, usd_24h_change: 0, usd_7d_change: 0, image: "", spark7d: [] },
+    BNB:  { usd: 0, usd_24h_change: 0, usd_7d_change: 0, image: "", spark7d: [] },
+    SOL:  { usd: 0, usd_24h_change: 0, usd_7d_change: 0, image: "", spark7d: [] },
+    USDC: { usd: 1, usd_24h_change: 0, usd_7d_change: 0, image: "", spark7d: [] },
+  };
+}
+
+function mergePrices(fresh: Prices | null, previous: Prices | null): Prices {
+  const fallback = emptyPrices();
+  const merged: Prices = {};
+
+  for (const symbol of Object.keys(fallback)) {
+    const freshCoin = fresh?.[symbol];
+    const prevCoin = previous?.[symbol];
+    const base = fallback[symbol];
+    const usableCoin = freshCoin?.usd ? freshCoin : (prevCoin?.usd ? prevCoin : freshCoin ?? prevCoin ?? base);
+    merged[symbol] = {
+      ...base,
+      ...usableCoin,
+      usd: usableCoin.usd || prevCoin?.usd || base.usd,
+      image: usableCoin.image || prevCoin?.image || base.image,
+      spark7d: usableCoin.spark7d?.length ? usableCoin.spark7d : (prevCoin?.spark7d ?? base.spark7d),
+    };
+  }
+
+  return merged;
 }
 
 export function useChainData() {
   const {
-    addresses, network,
+    addresses, network, mnemonic,
     setAssets, setTokens, setTxs, setPrices,
-    setLoading, setInitialLoaded,
+    setLoading, setInitialLoaded, setSourceState, markUpdated,
   } = useWalletStore();
-
-  const loadingRef = useRef(false);
 
   const refresh = useCallback(async (silent = false) => {
     if (!addresses) return;
-    if (loadingRef.current && !silent) return; // prevent duplicate calls
-    loadingRef.current = true;
+    if (activeRefresh) return;
+
+    activeRefresh = true;
     if (!silent) setLoading(true);
 
-    try {
-      // ── STEP 1: Prices (fast) ──────────────────────────────────
-      const p = await withTimeout(fetchPrices(), FETCH_TIMEOUT, null);
-      if (p) setPrices(p);
+    const sourceStatus = silent ? "refreshing" : "loading";
+    setSourceState("prices", { status: sourceStatus, error: undefined });
+    setSourceState("balances", { status: sourceStatus, error: undefined });
 
-      // ── STEP 2: Native balances in parallel (with individual fallbacks) ─
+    try {
+      const priceResult = await loadWithTimeout(fetchPrices(), FETCH_TIMEOUT);
+      const existingSnap = useWalletStore.getState();
+      const prices = mergePrices(priceResult.ok ? priceResult.value : null, existingSnap.prices);
+
+      setPrices(prices);
+      setSourceState("prices", {
+        status: priceResult.ok ? "ready" : (existingSnap.prices ? "partial" : "error"),
+        error: priceResult.ok ? undefined : priceResult.error,
+        updatedAt: Date.now(),
+      });
+
+      const bitcoinAddress = mnemonic ? bitcoinAddressForNetwork(mnemonic, network) : addresses.bitcoin;
       const [ethBal, bnbBal, btcBal, solBal] = await Promise.all([
-        withTimeout(getEthBalance(addresses.ethereum, network), FETCH_TIMEOUT, -1),
-        withTimeout(getBnbBalance(addresses.bsc, network),      FETCH_TIMEOUT, -1),
-        withTimeout(getBtcBalance(addresses.bitcoin, network),  FETCH_TIMEOUT, -1),
-        withTimeout(getSolBalance(addresses.solana),            FETCH_TIMEOUT, -1),
+        loadWithTimeout(getEthBalance(addresses.ethereum, network), FETCH_TIMEOUT),
+        loadWithTimeout(getBnbBalance(addresses.bsc, network), FETCH_TIMEOUT),
+        loadWithTimeout(getBtcBalance(bitcoinAddress, network), FETCH_TIMEOUT),
+        loadWithTimeout(getSolBalance(addresses.solana, network), FETCH_TIMEOUT),
       ]);
 
-      // Preserve existing prices/sparklines if fresh fetch failed (CoinGecko rate-limited)
-      const existingSnap = useWalletStore.getState() as { assets: AssetInfo[]; prices: import("./prices").Prices | null };
-      const prevPrices   = existingSnap.prices;
-      const prices = p ?? prevPrices ?? {
-        ETH:  { usd: 0, usd_24h_change: 0, usd_7d_change: 0, image: "", spark7d: [] },
-        BTC:  { usd: 0, usd_24h_change: 0, usd_7d_change: 0, image: "", spark7d: [] },
-        BNB:  { usd: 0, usd_24h_change: 0, usd_7d_change: 0, image: "", spark7d: [] },
-        SOL:  { usd: 0, usd_24h_change: 0, usd_7d_change: 0, image: "", spark7d: [] },
-        USDC: { usd: 1, usd_24h_change: 0, usd_7d_change: 0, image: "", spark7d: [] },
-      };
-
-      // Use -1 as sentinel: -1 means API failed → keep existing balance
-      const prevAssets = existingSnap.assets;
-      const safeBal = (fresh: number, id: string) =>
-        fresh >= 0 ? fresh : (prevAssets.find((a) => a.id === id)?.balance ?? 0);
+      const prevAssets = useWalletStore.getState().assets;
+      const safeBal = (fresh: LoadResult<number>, id: string) =>
+        fresh.ok ? fresh.value : (prevAssets.find((a) => a.id === id)?.balance ?? 0);
 
       const assets: AssetInfo[] = [
-        { id: "eth", symbol: "ETH", name: "Ethereum", network: "ethereum", balance: safeBal(ethBal, "eth"), priceUSD: prices.ETH?.usd ?? 0, change24h: prices.ETH?.usd_24h_change ?? 0, change7d: prices.ETH?.usd_7d_change ?? 0, spark7d: prices.ETH?.spark7d?.length ? prices.ETH.spark7d : (prevPrices?.ETH?.spark7d ?? []), image: prices.ETH?.image || prevPrices?.ETH?.image || "", desc: "Smart contract platform" },
-        { id: "btc", symbol: "BTC", name: "Bitcoin",  network: "bitcoin",  balance: safeBal(btcBal, "btc"), priceUSD: prices.BTC?.usd ?? 0, change24h: prices.BTC?.usd_24h_change ?? 0, change7d: prices.BTC?.usd_7d_change ?? 0, spark7d: prices.BTC?.spark7d?.length ? prices.BTC.spark7d : (prevPrices?.BTC?.spark7d ?? []), image: prices.BTC?.image || prevPrices?.BTC?.image || "", desc: "Original decentralised currency" },
-        { id: "bnb", symbol: "BNB", name: "BNB",      network: "bsc",      balance: safeBal(bnbBal, "bnb"), priceUSD: prices.BNB?.usd ?? 0, change24h: prices.BNB?.usd_24h_change ?? 0, change7d: prices.BNB?.usd_7d_change ?? 0, spark7d: prices.BNB?.spark7d?.length ? prices.BNB.spark7d : (prevPrices?.BNB?.spark7d ?? []), image: prices.BNB?.image || prevPrices?.BNB?.image || "", desc: "BNB Chain native token" },
-        { id: "sol", symbol: "SOL", name: "Solana",   network: "solana",   balance: safeBal(solBal, "sol"), priceUSD: prices.SOL?.usd ?? 0, change24h: prices.SOL?.usd_24h_change ?? 0, change7d: prices.SOL?.usd_7d_change ?? 0, spark7d: prices.SOL?.spark7d?.length ? prices.SOL.spark7d : (prevPrices?.SOL?.spark7d ?? []), image: prices.SOL?.image || prevPrices?.SOL?.image || "", desc: "High-performance L1" },
+        { id: "eth", symbol: "ETH", name: "Ethereum", network: "ethereum", balance: safeBal(ethBal, "eth"), priceUSD: prices.ETH?.usd ?? 0, change24h: prices.ETH?.usd_24h_change ?? 0, change7d: prices.ETH?.usd_7d_change ?? 0, spark7d: prices.ETH?.spark7d ?? [], image: prices.ETH?.image ?? "", desc: "Smart contract platform" },
+        { id: "btc", symbol: "BTC", name: "Bitcoin",  network: "bitcoin",  balance: safeBal(btcBal, "btc"), priceUSD: prices.BTC?.usd ?? 0, change24h: prices.BTC?.usd_24h_change ?? 0, change7d: prices.BTC?.usd_7d_change ?? 0, spark7d: prices.BTC?.spark7d ?? [], image: prices.BTC?.image ?? "", desc: "Original decentralised currency" },
+        { id: "bnb", symbol: "BNB", name: "BNB",      network: "bsc",      balance: safeBal(bnbBal, "bnb"), priceUSD: prices.BNB?.usd ?? 0, change24h: prices.BNB?.usd_24h_change ?? 0, change7d: prices.BNB?.usd_7d_change ?? 0, spark7d: prices.BNB?.spark7d ?? [], image: prices.BNB?.image ?? "", desc: "BNB Chain native token" },
+        { id: "sol", symbol: "SOL", name: "Solana",   network: "solana",   balance: safeBal(solBal, "sol"), priceUSD: prices.SOL?.usd ?? 0, change24h: prices.SOL?.usd_24h_change ?? 0, change7d: prices.SOL?.usd_7d_change ?? 0, spark7d: prices.SOL?.spark7d ?? [], image: prices.SOL?.image ?? "", desc: "High-performance L1" },
       ];
 
       setAssets(assets);
+      const balanceFailures = [ethBal, bnbBal, btcBal, solBal].filter((res) => !res.ok);
+      setSourceState("balances", {
+        status: balanceFailures.length ? "partial" : "ready",
+        error: balanceFailures.map((res) => !res.ok ? res.error : "").filter(Boolean).join("; ") || undefined,
+        updatedAt: Date.now(),
+      });
 
-      // ── STEP 3: Show UI immediately (no more skeletons) ────────
+      setSourceState("transactions", { status: sourceStatus, error: undefined });
+      const historyResult = await loadWithTimeout(fetchWalletHistory(addresses, bitcoinAddress, prices, network), 38_000);
+      const txs = historyResult.ok ? historyResult.value : useWalletStore.getState().transactions;
+      setTxs(txs);
+      setSourceState("transactions", {
+        status: historyResult.ok ? "ready" : (txs.length ? "partial" : "error"),
+        error: historyResult.ok ? undefined : historyResult.error,
+        updatedAt: Date.now(),
+      });
+
+      markUpdated();
       setInitialLoaded(true);
       setLoading(false);
-      loadingRef.current = false;
 
-      // ── STEP 4: Tokens in background (non-blocking) ───────────
       if (network === "mainnet") {
+        setSourceState("tokens", { status: "refreshing", error: undefined });
         const [evmTokens, splTokens] = await Promise.all([
-          withTimeout(fetchAllEvmTokens(addresses.ethereum), 25_000, []),
-          withTimeout(getSplTokens(addresses.solana), 15_000, []),
+          loadWithTimeout(fetchAllEvmTokens(addresses.ethereum, addresses.bsc), 25_000),
+          loadWithTimeout(getSplTokens(addresses.solana, network), 15_000),
         ]);
-        // Never overwrite existing tokens with empty — API timeout returns []
-        // and would silently wipe all visible tokens from the store
-        const storeSnap = useWalletStore.getState() as { evmTokens: unknown[] };
-        const hadTokens = storeSnap.evmTokens.length > 0;
-        if (evmTokens.length > 0 || splTokens.length > 0 || !hadTokens) {
-          setTokens(evmTokens, splTokens);
-        }
+        const storeSnap = useWalletStore.getState();
+        const nextEvm = evmTokens.ok ? evmTokens.value : storeSnap.evmTokens;
+        const nextSpl = splTokens.ok ? splTokens.value : storeSnap.splTokens;
+        if (evmTokens.ok || splTokens.ok) setTokens(nextEvm, nextSpl);
+        setSourceState("tokens", {
+          status: evmTokens.ok && splTokens.ok ? "ready" : "partial",
+          error: [evmTokens, splTokens].map((res) => !res.ok ? res.error : "").filter(Boolean).join("; ") || undefined,
+          updatedAt: Date.now(),
+        });
+      } else {
+        setTokens([], []);
+        setSourceState("tokens", { status: "ready", updatedAt: Date.now(), error: undefined });
       }
 
-      // ── STEP 5: Transactions (server-side API, allow plenty of time) ──
-      const [ethTxs, bnbTxs, btcTxs, solTxs] = await Promise.all([
-        withTimeout(getEthTransactions(addresses.ethereum, prices.ETH?.usd ?? 0, network), 30_000, []),
-        withTimeout(getBnbTransactions(addresses.bsc,      prices.BNB?.usd ?? 0, network), 30_000, []),
-        withTimeout(getBtcTransactions(addresses.bitcoin,  prices.BTC?.usd ?? 0, network), 15_000, []),
-        network === "mainnet"
-          ? withTimeout(getSolTransactions(addresses.solana, prices.SOL?.usd ?? 0), 20_000, [])
-          : Promise.resolve([]),
-      ]);
-
-      const txs = [...ethTxs, ...bnbTxs, ...btcTxs, ...solTxs]
-        .sort((a, b) => b.date.getTime() - a.date.getTime());
-      setTxs(txs);
-
-      // ── Cache fresh data (including tokens for instant next load) ──
-      const snap = useWalletStore.getState() as { evmTokens: unknown[]; splTokens: unknown[] };
+      const finalSnap = useWalletStore.getState();
       writeCache(addresses.ethereum, network, {
         assets,
         transactions: txs,
-        evmTokens: (snap.evmTokens ?? []) as import("./tokens").EvmToken[],
-        splTokens: (snap.splTokens ?? []) as import("./solana").SplToken[],
+        evmTokens: finalSnap.evmTokens,
+        splTokens: finalSnap.splTokens,
       });
-
     } catch (e) {
+      const error = e instanceof Error ? e.message : "Chain data failed";
       console.error("Chain data error:", e);
-      setInitialLoaded(true); // always unblock UI
+      setSourceState("balances", { status: "error", error });
+      setSourceState("transactions", { status: "error", error });
+      setInitialLoaded(true);
     } finally {
       setLoading(false);
-      loadingRef.current = false;
+      activeRefresh = false;
     }
-  }, [addresses, network]);
+  }, [addresses, markUpdated, mnemonic, network, setAssets, setInitialLoaded, setLoading, setPrices, setSourceState, setTokens, setTxs]);
+
+  useEffect(() => {
+    setWalletRefreshHandler(() => refresh(false));
+    return () => setWalletRefreshHandler(null);
+  }, [refresh]);
 
   useEffect(() => {
     if (!addresses) return;
 
-    // Always show cached data instantly (stale-while-revalidate)
-    const cached = readCacheAny(addresses.ethereum, network);
-    if (cached) {
-      setAssets(cached.assets);
-      setTxs(cached.transactions);
-      if (cached.evmTokens?.length || cached.splTokens?.length) {
+    const cacheKey = `${network}:${addresses.ethereum.toLowerCase()}`;
+    let cached = null;
+    if (hydratedCacheKey !== cacheKey) {
+      hydratedCacheKey = cacheKey;
+      cached = readCacheAny(addresses.ethereum, network);
+      if (cached) {
+        setAssets(cached.assets);
+        setTxs(cached.transactions);
         setTokens(cached.evmTokens ?? [], cached.splTokens ?? []);
+        setInitialLoaded(true);
       }
-      setInitialLoaded(true); // show cached UI immediately, no skeletons
     }
 
-    // Then refresh in background regardless of cache age
-    refresh(!!cached);
+    refresh(!!cached || useWalletStore.getState().initialLoaded);
 
     const id = setInterval(() => refresh(true), 60_000);
     return () => clearInterval(id);
-  }, [addresses, network]);
+  }, [addresses, network, refresh, setAssets, setInitialLoaded, setTokens, setTxs]);
 
   return { refresh: () => refresh(false) };
 }

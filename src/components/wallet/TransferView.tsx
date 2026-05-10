@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import QRCode from "qrcode";
 import { GlassCard }   from "@/components/ui/GlassCard";
@@ -10,10 +10,13 @@ import { CryptoIcon }  from "@/components/ui/CryptoIcon";
 import { useWalletStore } from "@/lib/store";
 import { derivePrivateKey } from "@/lib/wallet";
 import { sendEth, sendBnb, sendErc20, estimateGasUSD } from "@/lib/chains";
+import { bitcoinAddressForNetwork, sendBtc } from "@/lib/bitcoin";
+import { sendSol } from "@/lib/solana";
 import { formatUSD, formatCrypto } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 import type { AssetInfo } from "@/lib/store";
 import type { EvmToken } from "@/lib/tokens";
+import type { SplToken } from "@/lib/solana";
 
 /* ── Normalised picker asset ─────────────────────────────────────── */
 type PickAsset = {
@@ -25,6 +28,7 @@ type PickAsset = {
   network:  "ethereum" | "bsc" | "bitcoin" | "solana";
   image:    string;
   isToken:  boolean;
+  tokenKind?: "evm" | "spl";
   contract?: `0x${string}`;
   decimals?: number;
 };
@@ -37,10 +41,22 @@ function fromEvmToken(t: EvmToken): PickAsset {
     id: `tok_${t.contract}`, symbol: t.symbol, name: t.name,
     balance: t.balance, priceUSD: t.priceUSD,
     network: t.chain === "bsc" ? "bsc" : "ethereum",
-    image: t.image, isToken: true,
+    image: t.image, isToken: true, tokenKind: "evm",
     contract: t.contract as `0x${string}`,
     decimals: t.decimals,
   };
+}
+function fromSplToken(t: SplToken): PickAsset {
+  const symbol = t.symbol ?? t.mint.slice(0, 6);
+  return {
+    id: `spl_${t.mint}`, symbol, name: t.name ?? symbol,
+    balance: t.amount, priceUSD: t.priceUSD ?? 0,
+    network: "solana", image: t.logoURI ?? "", isToken: true, tokenKind: "spl",
+  };
+}
+
+function canSendAsset(asset: PickAsset) {
+  return !asset.isToken || asset.tokenKind === "evm";
 }
 
 /* ── Constants ─────────────────────────────────────────────────── */
@@ -57,8 +73,8 @@ const NET_SHORT: Record<string, string> = {
   ethereum: "ETH", bitcoin: "BTC", bsc: "BSC", solana: "SOL",
 };
 const EXPLORERS: Record<string, Record<string, string>> = {
-  mainnet: { ethereum: "https://etherscan.io/tx/",     bitcoin: "https://blockstream.info/tx/",         bsc: "https://bscscan.com/tx/" },
-  testnet: { ethereum: "https://sepolia.etherscan.io/tx/", bitcoin: "https://blockstream.info/testnet/tx/", bsc: "https://testnet.bscscan.com/tx/" },
+  mainnet: { ethereum: "https://etherscan.io/tx/", bitcoin: "https://blockstream.info/tx/", bsc: "https://bscscan.com/tx/", solana: "https://solscan.io/tx/" },
+  testnet: { ethereum: "https://sepolia.etherscan.io/tx/", bitcoin: "https://blockstream.info/testnet/tx/", bsc: "https://testnet.bscscan.com/tx/", solana: "https://solscan.io/tx/" },
 };
 
 type Tab      = "send" | "receive";
@@ -167,7 +183,7 @@ function AssetPicker({ selected, assets, onSelect }: {
                       <span style={{ fontSize: 11, color: "rgba(255,255,255,0.28)" }}>{formatCrypto(a.balance, 5)} {a.symbol}</span>
                     </div>
                     <span style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", fontVariantNumeric: "tabular-nums" }}>
-                      {a.balance * a.priceUSD > 0.001 ? formatUSD(a.balance * a.priceUSD) : "—"}
+                      {a.priceUSD > 0 ? formatUSD(a.balance * a.priceUSD) : "Balance only"}
                     </span>
                   </button>
                   {i < filtered.length - 1 && <div style={S.divider} />}
@@ -198,7 +214,7 @@ function GasEstimate({ asset, network }: { asset: PickAsset; network: string }) 
   }, [asset, network]);
 
   if (asset.network === "bitcoin" || asset.network === "solana") {
-    return <span style={{ fontSize: 12, color: "rgba(255,255,255,0.28)" }}>≈ network fee varies</span>;
+    return <span style={{ fontSize: 12, color: "rgba(255,255,255,0.28)" }}>Network fee calculated on send</span>;
   }
 
   return fee === null
@@ -219,7 +235,7 @@ function QRDisplay({ value }: { value: string }) {
     }).then(setSrc).catch(console.error);
   }, [value]);
 
-  if (!src) return <div style={{ width: 220, height: 220 }} />;
+  if (!src) return <div style={{ width: "min(220px, 68vw)", aspectRatio: "1 / 1" }} />;
 
   return (
     <motion.img
@@ -227,70 +243,8 @@ function QRDisplay({ value }: { value: string }) {
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.2 }}
-      style={{ width: 220, height: 220, display: "block" }}
+      style={{ width: "min(220px, 68vw)", height: "auto", aspectRatio: "1 / 1", display: "block" }}
     />
-  );
-}
-
-/* ── Deposit Monitor ─────────────────────────────────────────────── */
-function DepositMonitor({ asset, address, network }: { asset: PickAsset; address: string; network: string }) {
-  const [detected, setDetected] = useState<{ amount: number; hash: string } | null>(null);
-  const lastHashRef = useRef<string>("");
-  const toast = useToast();
-
-  useEffect(() => {
-    if (asset.network === "bitcoin" || asset.network === "solana") return;
-    const net = network as "mainnet" | "testnet";
-
-    const poll = async () => {
-      try {
-        const url = asset.network === "bsc"
-          ? (net === "testnet"
-              ? `https://bsc-testnet.blockscout.com/api/v2/addresses/${address}/transactions?filter=to`
-              : `https://bsc.blockscout.com/api/v2/addresses/${address}/transactions?filter=to`)
-          : (net === "testnet"
-              ? `https://eth-sepolia.blockscout.com/api/v2/addresses/${address}/transactions?filter=to`
-              : `https://eth.blockscout.com/api/v2/addresses/${address}/transactions?filter=to`);
-        const r   = await fetch(url);
-        const d   = await r.json();
-        const items = (d.items ?? []) as { hash: string; value: string }[];
-        if (!items.length) return;
-        const newest = items[0];
-        if (newest.hash !== lastHashRef.current) {
-          if (lastHashRef.current) {
-            const { formatEther } = await import("viem");
-            const amount = parseFloat(formatEther(BigInt(newest.value)));
-            setDetected({ amount, hash: newest.hash });
-            toast(`Received ${amount.toFixed(5)} ${asset.symbol}!`);
-          }
-          lastHashRef.current = newest.hash;
-        }
-      } catch { /* ignore */ }
-    };
-
-    poll();
-    const id = setInterval(poll, 12_000);
-    return () => clearInterval(id);
-  }, [asset, address, network, toast]);
-
-  if (!detected) {
-    return (
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <motion.div
-          animate={{ opacity: [0.4, 1, 0.4] }}
-          transition={{ duration: 2, repeat: Infinity }}
-          style={{ width: 6, height: 6, borderRadius: "50%", background: "rgba(120,220,90,0.80)", flexShrink: 0 }}
-        />
-        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.28)" }}>Monitoring for incoming {asset.symbol}</span>
-      </div>
-    );
-  }
-
-  return (
-    <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      <div style={{ width: 6, height: 6, borderRadius: "50%", background: "rgba(120,220,90,0.90)", flexShrink: 0 }} />
-      <span style={{ fontSize: 11, color: "rgba(120,220,90,0.85)" }}>Received {formatCrypto(detected.amount, 6)} {asset.symbol}</span>
-    </motion.div>
   );
 }
 
@@ -371,14 +325,15 @@ function Row({ label, value, mono, last }: { label: string; value: string; mono?
 
 /* ── MAIN ────────────────────────────────────────────────────────── */
 export function TransferView() {
-  const { assets, evmTokens, addresses, mnemonic, network } = useWalletStore();
+  const { assets, evmTokens, splTokens, addresses, mnemonic, network, setTxs, hiddenAssetIds } = useWalletStore();
   const toast = useToast();
 
   // All picker assets: native + ERC-20 tokens
   const allAssets = useMemo<PickAsset[]>(() => [
-    ...assets.map(fromNative),
-    ...evmTokens.map(fromEvmToken),
-  ], [assets, evmTokens]);
+    ...assets.filter((a) => !hiddenAssetIds.includes(`native:${a.id}`)).map(fromNative),
+    ...evmTokens.filter((t) => !hiddenAssetIds.includes(`evm:${t.chain}:${t.contract.toLowerCase()}`)).map(fromEvmToken),
+    ...splTokens.filter((t) => !hiddenAssetIds.includes(`spl:${t.mint}`)).map(fromSplToken),
+  ], [assets, evmTokens, splTokens, hiddenAssetIds]);
 
   const [tab,    setTab]    = useState<Tab>("send");
   const [step,   setStep]   = useState<Step>("form");
@@ -389,26 +344,40 @@ export function TransferView() {
   const [error,  setError]  = useState("");
   const [loading, setLoading] = useState(false);
   const [gasFee,  setGasFee]  = useState<number | null>(null);
+  const pickerAssets = useMemo(() => tab === "send" ? allAssets.filter(canSendAsset) : allAssets, [allAssets, tab]);
 
   // Initialise asset once assets load
   useEffect(() => {
-    if (!asset && allAssets.length > 0) setAsset(allAssets[0]);
-  }, [allAssets, asset]);
+    if (pickerAssets.length === 0) return;
+    const nextAsset = !asset || !pickerAssets.some((a) => a.id === asset.id)
+      ? pickerAssets[0]
+      : null;
+    if (!nextAsset) return;
+    queueMicrotask(() => {
+      setAsset(nextAsset);
+      if (asset) setAmount("");
+    });
+  }, [pickerAssets, asset]);
 
   const switchTab = (t: Tab) => { setTab(t); setStep("form"); setError(""); setAmount(""); setToAddr(""); setTxHash(""); };
 
   const amountNum = parseFloat(amount) || 0;
   const amountUSD = asset ? amountNum * asset.priceUSD : 0;
   const isEVM     = asset?.network === "ethereum" || asset?.network === "bsc";
+  const isNativeSend = asset && !asset.isToken && (asset.network === "ethereum" || asset.network === "bsc" || asset.network === "bitcoin" || asset.network === "solana");
+  const isEvmTokenSend = !!asset?.isToken && asset.tokenKind === "evm";
+  const canSend = !!asset && canSendAsset(asset) && (isNativeSend || isEvmTokenSend);
 
   const isValidAddr = isEVM
     ? /^0x[0-9a-fA-F]{40}$/.test(toAddr)
-    : /^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,62}$/.test(toAddr);
+    : asset?.network === "bitcoin"
+      ? /^(bc1|tb1|[13mn2])[a-zA-HJ-NP-Z0-9]{25,80}$/.test(toAddr)
+      : /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(toAddr);
 
-  const isValid = amountNum > 0 && !!asset && amountNum <= asset.balance && isValidAddr;
+  const isValid = amountNum > 0 && !!asset && amountNum <= asset.balance && isValidAddr && canSend;
 
   const loadGasFee = useCallback(async () => {
-    if (!asset || !isEVM) return;
+    if (!asset || !isEVM) { setGasFee(null); return; }
     const fee = await estimateGasUSD(asset.priceUSD || 2500, network).catch(() => null);
     setGasFee(fee);
   }, [asset, isEVM, network]);
@@ -417,11 +386,11 @@ export function TransferView() {
 
   const handleSend = async () => {
     if (!mnemonic || !asset) return;
-    if (!isEVM) { setError("BTC signing not supported yet"); return; }
+    if (!canSend) { setError(`${asset.symbol} sending is not available for this asset type`); return; }
     setLoading(true); setError("");
     try {
       const privKey = derivePrivateKey(mnemonic);
-      let hash: `0x${string}`;
+      let hash: string;
 
       if (asset.isToken && asset.contract && asset.decimals !== undefined) {
         hash = await sendErc20({
@@ -435,11 +404,30 @@ export function TransferView() {
         });
       } else if (asset.network === "ethereum") {
         hash = await sendEth({ privateKey: privKey, to: toAddr as `0x${string}`, amount, net: network });
-      } else {
+      } else if (asset.network === "bsc") {
         hash = await sendBnb({ privateKey: privKey, to: toAddr as `0x${string}`, amount, net: network });
+      } else if (asset.network === "bitcoin") {
+        hash = await sendBtc({ mnemonic, to: toAddr, amount, net: network });
+      } else {
+        hash = await sendSol({ mnemonic, to: toAddr, amount, network });
       }
 
       setTxHash(hash);
+      const pending = {
+        hash,
+        type: "send" as const,
+        asset: asset.symbol,
+        amount: amountNum,
+        amountUSD,
+        from: receiveAddr,
+        to: toAddr,
+        date: new Date(),
+        status: "pending" as const,
+        isToken: asset.isToken,
+        tokenSymbol: asset.isToken ? asset.symbol : undefined,
+        id: `${hash}:pending:${asset.id}`,
+      };
+      setTxs([pending, ...useWalletStore.getState().transactions.filter((t) => t.hash !== hash)]);
       setStep("done");
       toast("Transaction broadcast!");
     } catch (e) {
@@ -450,7 +438,7 @@ export function TransferView() {
   };
 
   const receiveAddr = !asset ? ""
-    : asset.network === "bitcoin" ? (addresses?.bitcoin  ?? "")
+    : asset.network === "bitcoin" ? (mnemonic ? bitcoinAddressForNetwork(mnemonic, network) : (addresses?.bitcoin ?? ""))
     : asset.network === "solana"  ? (addresses?.solana   ?? "")
     : asset.network === "bsc"     ? (addresses?.bsc      ?? "")
     :                               (addresses?.ethereum ?? "");
@@ -464,7 +452,7 @@ export function TransferView() {
 
   /* ─── SUCCESS ─────────────────────────────────────────────────── */
   if (step === "done") return (
-    <div style={{ minHeight: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 32 }}>
+    <div className="view-center-shell" style={{ minHeight: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 32 }}>
       <motion.div initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: "spring", stiffness: 260, damping: 22 }}
         style={{ maxWidth: 400, width: "100%", display: "flex", flexDirection: "column", gap: 20 }}>
         <div style={{ width: 72, height: 72, borderRadius: "50%", margin: "0 auto 8px", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(120,220,90,0.08)", border: "1px solid rgba(120,220,90,0.25)", borderTop: "1px solid rgba(120,220,90,0.40)", boxShadow: "0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(120,220,90,0.15)" }}>
@@ -474,7 +462,9 @@ export function TransferView() {
         </div>
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 26, fontWeight: 300, color: "#fff", letterSpacing: "-0.015em", marginBottom: 6 }}>Sent</div>
-          <div style={{ fontSize: 15, color: "rgba(255,255,255,0.50)", fontVariantNumeric: "tabular-nums" }}>{amount} {asset.symbol} · {amountUSD > 0 ? formatUSD(amountUSD) : ""}</div>
+          <div style={{ fontSize: 15, color: "rgba(255,255,255,0.50)", fontVariantNumeric: "tabular-nums" }}>
+            {amount} {asset.symbol}{amountUSD > 0 ? ` · ${formatUSD(amountUSD)}` : ""}
+          </div>
         </div>
         <GlassCard elevated style={{ padding: "8px 20px" }}>
           <TxTracker hash={txHash} assetNetwork={asset.network} network={network} />
@@ -488,7 +478,7 @@ export function TransferView() {
 
   /* ─── CONFIRM ─────────────────────────────────────────────────── */
   if (step === "confirm") return (
-    <div style={{ minHeight: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 32 }}>
+    <div className="view-center-shell" style={{ minHeight: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 32 }}>
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
         style={{ maxWidth: 420, width: "100%", display: "flex", flexDirection: "column", gap: 20 }}>
         <div>
@@ -500,7 +490,7 @@ export function TransferView() {
           <Row label="Amount"      value={`${amount} ${asset.symbol}`} />
           {amountUSD > 0 && <Row label="Value" value={formatUSD(amountUSD)} />}
           <Row label="To"          value={`${toAddr.slice(0,10)}…${toAddr.slice(-8)}`} mono />
-          <Row label="Network fee" value={gasFee ? formatUSD(gasFee) : "—"} last />
+          <Row label="Network fee" value={gasFee ? formatUSD(gasFee) : "Calculated on broadcast"} last />
         </GlassCard>
         {network === "testnet" && (
           <div style={{ display: "flex", gap: 8, padding: "10px 14px", borderRadius: 12, background: "rgba(251,191,36,0.07)", border: "1px solid rgba(251,191,36,0.20)" }}>
@@ -521,23 +511,23 @@ export function TransferView() {
 
   /* ─── FORM ────────────────────────────────────────────────────── */
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
+    <motion.div className="view-shell transfer-shell" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
       style={{ padding: "32px 28px", maxWidth: 560, display: "flex", flexDirection: "column", gap: 24 }}>
 
       {/* Title + Tab toggle */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div>
+      <div className="view-title-row" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div className="transfer-title-block">
           <span style={S.label}>Wallet</span>
           <div style={{ fontSize: 28, fontWeight: 300, color: "#fff", letterSpacing: "-0.015em" }}>Transfer</div>
         </div>
-        <div style={{ display: "flex", padding: 3, borderRadius: 14, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", boxShadow: "inset 0 1px 4px rgba(0,0,0,0.3)" }}>
+        <div className="transfer-tabs" style={{ display: "flex", padding: 3, borderRadius: 14, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", boxShadow: "inset 0 1px 4px rgba(0,0,0,0.3)" }}>
           {(["send","receive"] as Tab[]).map((t) => (
-            <div key={t} style={{ position: "relative" }}>
+            <div className="transfer-tab-wrap" key={t} style={{ position: "relative" }}>
               {tab === t && (
                 <motion.div layoutId="tab-bg" transition={{ type: "spring", stiffness: 420, damping: 36 }}
                   style={{ position: "absolute", inset: 0, borderRadius: 11, background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.14)", borderTop: "1px solid rgba(255,255,255,0.22)", boxShadow: "0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.10)" }} />
               )}
-              <button onClick={() => switchTab(t)} style={{ position: "relative", zIndex: 1, padding: "7px 18px", borderRadius: 11, border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 500, color: tab === t ? "#fff" : "rgba(255,255,255,0.35)", transition: "color 0.15s", display: "flex", alignItems: "center", gap: 6 }}>
+              <button className="transfer-tab-button" onClick={() => switchTab(t)} style={{ position: "relative", zIndex: 1, padding: "7px 18px", borderRadius: 11, border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 500, color: tab === t ? "#fff" : "rgba(255,255,255,0.35)", transition: "color 0.15s", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
                 {t === "send" ? <Icons.send size={13} /> : <Icons.receive size={13} />}
                 {t.charAt(0).toUpperCase() + t.slice(1)}
               </button>
@@ -546,13 +536,13 @@ export function TransferView() {
         </div>
       </div>
 
-      {/* Asset picker — shows native + ERC-20 tokens */}
-      <AssetPicker selected={asset} assets={allAssets} onSelect={(a) => { setAsset(a); setAmount(""); }} />
+      {/* Asset picker */}
+      <AssetPicker selected={asset} assets={pickerAssets} onSelect={(a) => { setAsset(a); setAmount(""); }} />
 
       <AnimatePresence mode="wait">
         {/* ══ SEND ══════════════════════════════════════════════════ */}
         {tab === "send" && (
-          <motion.div key="send" initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }} transition={{ duration: 0.18 }}
+          <motion.div className="transfer-panel" key="send" initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }} transition={{ duration: 0.18 }}
             style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
             <GlassInput
@@ -586,14 +576,7 @@ export function TransferView() {
               </div>
             </div>
 
-            {!isEVM && (
-              <div style={{ display: "flex", gap: 8, padding: "10px 14px", borderRadius: 12, background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.18)" }}>
-                <Icons.info size={14} color="rgba(251,191,36,0.75)" />
-                <span style={{ fontSize: 12, color: "rgba(251,191,36,0.70)" }}>BTC signing via external hardware wallet coming soon.</span>
-              </div>
-            )}
-
-            <GlassButton variant="primary" size="lg" style={{ width: "100%" }} disabled={!isValid || !isEVM} onClick={goConfirm}>
+            <GlassButton variant="primary" size="lg" style={{ width: "100%" }} disabled={!isValid} onClick={goConfirm}>
               Continue <Icons.chevronR size={14} color="#000" />
             </GlassButton>
           </motion.div>
@@ -601,16 +584,16 @@ export function TransferView() {
 
         {/* ══ RECEIVE ═══════════════════════════════════════════════ */}
         {tab === "receive" && (
-          <motion.div key="receive" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.18 }}
+          <motion.div className="transfer-panel" key="receive" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.18 }}
             style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
-            <GlassCard elevated style={{ overflow: "hidden" }}>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20, padding: "24px 24px 20px" }}>
-                <div style={{ padding: 16, borderRadius: 20, background: "rgba(255,255,255,0.055)", border: "1px solid rgba(255,255,255,0.10)", borderTop: "1px solid rgba(255,255,255,0.20)", boxShadow: "0 4px 20px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.10)" }}>
+            <GlassCard className="receive-card" elevated style={{ overflow: "hidden" }}>
+              <div className="receive-card-inner" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20, padding: "24px 24px 20px" }}>
+                <div className="receive-qr-frame" style={{ padding: 16, borderRadius: 20, background: "rgba(255,255,255,0.055)", border: "1px solid rgba(255,255,255,0.10)", borderTop: "1px solid rgba(255,255,255,0.20)", boxShadow: "0 4px 20px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.10)" }}>
                   <QRDisplay value={receiveAddr} />
                 </div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 12px", borderRadius: 20, background: NET_BG[asset.network], border: "1px solid rgba(255,255,255,0.09)" }}>
+                <div className="receive-network-pill" style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 12px", borderRadius: 20, background: NET_BG[asset.network], border: "1px solid rgba(255,255,255,0.09)" }}>
                   <CryptoIcon symbol={asset.symbol} image={asset.image} size={14} />
                   <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.65)", letterSpacing: "0.03em" }}>
                     {NET_LABEL[asset.network]} · {NET_SHORT[asset.network]}
@@ -618,26 +601,31 @@ export function TransferView() {
                   </span>
                 </div>
 
-                <div style={{ textAlign: "center", width: "100%" }}>
+                <div className="receive-address-block" style={{ textAlign: "center", width: "100%" }}>
                   <span style={S.label}>Your {asset.isToken ? asset.symbol : asset.symbol} address</span>
-                  <div style={{ fontSize: 12, fontFamily: "monospace", color: "rgba(255,255,255,0.50)", wordBreak: "break-all", lineHeight: 1.7, padding: "0 8px" }}>
+                  <div className="receive-address-text" style={{ fontSize: 12, fontFamily: "monospace", color: "rgba(255,255,255,0.50)", wordBreak: "break-all", lineHeight: 1.7, padding: "0 8px" }}>
                     {receiveAddr}
                   </div>
                 </div>
 
-                <div style={{ display: "flex", gap: 10, width: "100%" }}>
+                <div className="receive-actions" style={{ display: "flex", gap: 10, width: "100%" }}>
                   <GlassButton variant="default" size="md" style={{ flex: 1 }} onClick={() => { navigator.clipboard.writeText(receiveAddr); toast(`${asset.symbol} address copied`); }}>
                     <Icons.copy size={13} /> Copy
                   </GlassButton>
-                  <GlassButton variant="ghost" size="md" style={{ flex: 1 }}>
+                  <GlassButton variant="ghost" size="md" style={{ flex: 1 }} onClick={async () => {
+                    const data = { title: `${asset.symbol} address`, text: receiveAddr };
+                    if (typeof navigator.share === "function") {
+                      await navigator.share(data).catch(() => undefined);
+                    } else {
+                      await navigator.clipboard.writeText(receiveAddr);
+                      toast(`${asset.symbol} address copied`);
+                    }
+                  }}>
                     <Icons.share size={13} /> Share
                   </GlassButton>
                 </div>
               </div>
 
-              <div style={{ padding: "12px 20px 16px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                {receiveAddr && <DepositMonitor asset={asset} address={receiveAddr} network={network} />}
-              </div>
             </GlassCard>
 
             {network === "testnet" && (
@@ -657,7 +645,7 @@ export function TransferView() {
               </div>
             )}
 
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.18)", textAlign: "center", lineHeight: 1.5 }}>
+            <div className="receive-warning" style={{ fontSize: 12, color: "rgba(255,255,255,0.18)", textAlign: "center", lineHeight: 1.5 }}>
               {asset.isToken
                 ? `Send only ${asset.symbol} (${NET_LABEL[asset.network]}) to this address.`
                 : `Only send ${asset.symbol} (${NET_LABEL[asset.network]}) to this address.`

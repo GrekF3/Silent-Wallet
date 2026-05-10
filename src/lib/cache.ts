@@ -4,6 +4,7 @@ import type { EvmToken } from "./tokens";
 import type { SplToken } from "./solana";
 
 type CachePayload = {
+  version:      number;
   assets:       AssetInfo[];
   transactions: ChainTx[];
   evmTokens:    EvmToken[];
@@ -11,6 +12,7 @@ type CachePayload = {
   ts:           number;
 };
 
+const CACHE_VERSION = 5;
 const TTL = 30 * 60 * 1000; // 30 min — стейл данные лучше чем ничего
 
 function key(address: string, network: string) {
@@ -22,6 +24,7 @@ export function readCache(address: string, network: string): CachePayload | null
     const raw = localStorage.getItem(key(address, network));
     if (!raw) return null;
     const p: CachePayload = JSON.parse(raw);
+    if (p.version !== CACHE_VERSION) return null;
     // Restore Date objects
     p.transactions = p.transactions.map((t) => ({ ...t, date: new Date(t.date) }));
     // Return even if stale — caller decides what to do with old data
@@ -36,13 +39,14 @@ export function readCacheAny(address: string, network: string): CachePayload | n
     const raw = localStorage.getItem(key(address, network));
     if (!raw) return null;
     const p: CachePayload = JSON.parse(raw);
+    if (p.version !== CACHE_VERSION) return null;
     p.transactions = p.transactions.map((t) => ({ ...t, date: new Date(t.date) }));
     return p; // return regardless of age
   } catch { return null; }
 }
 
-export function writeCache(address: string, network: string, payload: Omit<CachePayload, "ts">) {
+export function writeCache(address: string, network: string, payload: Omit<CachePayload, "ts" | "version">) {
   try {
-    localStorage.setItem(key(address, network), JSON.stringify({ ...payload, ts: Date.now() }));
+    localStorage.setItem(key(address, network), JSON.stringify({ ...payload, version: CACHE_VERSION, ts: Date.now() }));
   } catch { /* quota exceeded */ }
 }

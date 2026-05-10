@@ -1,12 +1,16 @@
 "use client";
-import { motion } from "framer-motion";
+import { useState } from "react";
+import { createPortal } from "react-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { GlassCard }   from "@/components/ui/GlassCard";
 import { GlassButton } from "@/components/ui/GlassButton";
 import { Icons }       from "@/components/ui/Icon";
 import { CryptoIcon }  from "@/components/ui/CryptoIcon";
 import { useWalletStore } from "@/lib/store";
-import { useChainData }   from "@/lib/useChainData";
-import { formatUSD, formatCrypto, formatDate } from "@/lib/utils";
+import { refreshWalletData } from "@/lib/walletRefresh";
+import { formatUSD, formatCrypto, formatDate, formatDateDay } from "@/lib/utils";
+import { useToast } from "@/components/ui/Toast";
+import type { ChainTx } from "@/lib/chains";
 
 type Filter = "all" | "send" | "receive";
 const FILTERS: { id: Filter; label: string }[] = [
@@ -15,10 +19,6 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "send",    label: "Sent"     },
 ];
 
-function formatTime(d: Date) {
-  return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
-}
-
 function Bone({ w, h, r = 8 }: { w: number | string; h: number; r?: number }) {
   return (
     <motion.div animate={{ opacity: [0.25, 0.5, 0.25] }} transition={{ duration: 1.8, repeat: Infinity }}
@@ -26,16 +26,113 @@ function Bone({ w, h, r = 8 }: { w: number | string; h: number; r?: number }) {
   );
 }
 
+const EXPLORERS = {
+  mainnet: { ethereum: "https://etherscan.io/tx/", bsc: "https://bscscan.com/tx/", bitcoin: "https://blockstream.info/tx/", solana: "https://solscan.io/tx/" },
+  testnet: { ethereum: "https://sepolia.etherscan.io/tx/", bsc: "https://testnet.bscscan.com/tx/", bitcoin: "https://blockstream.info/testnet/tx/", solana: "https://solscan.io/tx/" },
+} as const;
+
+function inferNetwork(tx: ChainTx): keyof typeof EXPLORERS.mainnet {
+  if (tx.network) return tx.network;
+  if (tx.asset === "BTC") return "bitcoin";
+  if (tx.asset === "SOL") return "solana";
+  if (tx.asset === "BNB" || tx.asset === "USDT" || tx.asset === "BSC-USD") return "bsc";
+  return "ethereum";
+}
+
+function short(value: string) {
+  if (!value) return "Unknown";
+  return value.length > 18 ? `${value.slice(0, 10)}...${value.slice(-8)}` : value;
+}
+
+function DetailRow({ label, value, mono, copyValue }: { label: string; value: string; mono?: boolean; copyValue?: string }) {
+  const toast = useToast();
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "12px 0", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+      <span style={{ fontSize: 12, color: "rgba(255,255,255,0.34)" }}>{label}</span>
+      <button
+        onClick={() => copyValue && navigator.clipboard.writeText(copyValue).then(() => toast(`${label} copied`))}
+        disabled={!copyValue}
+        style={{ minWidth: 0, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 7, border: "none", background: "transparent", color: "#fff", cursor: copyValue ? "pointer" : "default", fontFamily: mono ? "monospace" : "inherit", fontSize: 12, fontWeight: 500 }}
+      >
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</span>
+        {copyValue && <Icons.copy size={12} color="rgba(255,255,255,0.34)" />}
+      </button>
+    </div>
+  );
+}
+
+function TxDetailsModal({ tx, onClose }: { tx: ChainTx; onClose: () => void }) {
+  const { network } = useWalletStore();
+  const chain = inferNetwork(tx);
+  const explorer = EXPLORERS[network]?.[chain] ?? "";
+  const value = tx.amountUSD > 0.001 ? formatUSD(tx.amountUSD) : "Value unavailable";
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.16 }}
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, zIndex: 80, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, background: "rgba(0,0,0,0.62)", backdropFilter: "blur(10px)" }}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 12, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 8, scale: 0.98 }}
+        transition={{ duration: 0.18 }}
+        onClick={(e) => e.stopPropagation()}
+        style={{ width: "min(480px, 100%)" }}
+      >
+        <GlassCard elevated style={{ padding: 22 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18 }}>
+            <div style={{ width: 48, height: 48, borderRadius: 15, display: "flex", alignItems: "center", justifyContent: "center", background: tx.type === "receive" ? "rgba(120,220,90,0.08)" : "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.10)" }}>
+              <CryptoIcon symbol={tx.asset} image={tx.tokenImage} size={26} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 18, fontWeight: 600, color: "#fff", marginBottom: 4 }}>{tx.type === "receive" ? "Received" : "Sent"} {tx.asset}</div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.32)", textTransform: "uppercase", letterSpacing: "0.08em" }}>{chain} · {tx.status}</div>
+            </div>
+            <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.05)", cursor: "pointer" }}>
+              <Icons.x size={15} color="rgba(255,255,255,0.55)" />
+            </button>
+          </div>
+
+          <div style={{ fontSize: 28, fontWeight: 300, color: "#fff", marginBottom: 4, fontVariantNumeric: "tabular-nums" }}>
+            {tx.type === "receive" ? "+" : "-"}{formatCrypto(tx.amount, 6)} {tx.asset}
+          </div>
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.36)", marginBottom: 16 }}>{value}</div>
+
+          <DetailRow label="Date" value={formatDate(tx.date)} />
+          <DetailRow label="From" value={short(tx.from)} mono copyValue={tx.from} />
+          <DetailRow label="To" value={short(tx.to)} mono copyValue={tx.to} />
+          {tx.tokenContract && <DetailRow label="Contract" value={short(tx.tokenContract)} mono copyValue={tx.tokenContract} />}
+          <DetailRow label="Hash" value={short(tx.hash)} mono copyValue={tx.hash} />
+
+          {explorer && (
+            <a href={`${explorer}${tx.hash}`} target="_blank" rel="noopener noreferrer" style={{ marginTop: 16, height: 42, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, textDecoration: "none", color: "#000", background: "#fff", fontSize: 13, fontWeight: 650 }}>
+              View on explorer <Icons.externalLink size={14} color="#000" />
+            </a>
+          )}
+        </GlassCard>
+      </motion.div>
+    </motion.div>,
+    document.body
+  );
+}
+
 export function HistoryView() {
   const { transactions, historyFilter, setFilter, loading } = useWalletStore();
-  const { refresh } = useChainData();
+  const [selectedTx, setSelectedTx] = useState<ChainTx | null>(null);
 
   const filtered = historyFilter === "all"
     ? transactions
     : transactions.filter((t) => t.type === historyFilter);
 
   const grouped = filtered.reduce<Record<string, typeof transactions>>((acc, tx) => {
-    const key = formatDate(tx.date);
+    const key = formatDateDay(tx.date);
     (acc[key] ??= []).push(tx);
     return acc;
   }, {});
@@ -47,6 +144,7 @@ export function HistoryView() {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }}
+      className="view-shell"
       style={{ padding: "36px 28px", display: "flex", flexDirection: "column", gap: 24, maxWidth: 680 }}
     >
       {/* Header */}
@@ -58,7 +156,7 @@ export function HistoryView() {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 12, color: "rgba(255,255,255,0.24)" }}>{filtered.length} transactions</span>
           <button
-            onClick={() => refresh()}
+            onClick={() => refreshWalletData()}
             disabled={loading}
             style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 10, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", cursor: loading ? "default" : "pointer", color: "rgba(255,255,255,0.45)", fontSize: 12, fontFamily: "inherit", fontWeight: 500, transition: "all 0.15s" }}
             onMouseEnter={(e) => { if (!loading) (e.currentTarget.style.background = "rgba(255,255,255,0.09)"); }}
@@ -126,7 +224,7 @@ export function HistoryView() {
           <div style={{ fontSize: 13, color: "rgba(255,255,255,0.20)", marginBottom: 24 }}>
             Transactions appear here after indexing.<br />Try refreshing or check back in a moment.
           </div>
-          <GlassButton variant="default" size="md" onClick={() => refresh()}>
+          <GlassButton variant="default" size="md" onClick={() => refreshWalletData()}>
             <Icons.swap size={13} /> Refresh now
           </GlassButton>
         </div>
@@ -138,10 +236,13 @@ export function HistoryView() {
             <GlassCard elevated style={{ overflow: "hidden" }}>
               {txs.map((tx, idx) => (
                 <div key={tx.hash + idx}>
-                  <motion.div
-                    whileHover={{ background: "rgba(255,255,255,0.025)" }}
+                  <motion.button
+                    type="button"
+                    aria-label={`${tx.type === "receive" ? "Received" : "Sent"} ${tx.asset} transaction details`}
+                    onClick={() => setSelectedTx(tx)}
+                    whileHover={{ backgroundColor: "rgba(255,255,255,0.025)" }}
                     transition={{ duration: 0.12 }}
-                    style={{ display: "flex", alignItems: "center", gap: 14, padding: "15px 18px", cursor: "pointer" }}
+                    style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "15px 18px", cursor: "pointer", border: "none", backgroundColor: "rgba(255,255,255,0)", fontFamily: "inherit", textAlign: "left" }}
                   >
                     {/* Coin icon */}
                     <div style={{
@@ -151,7 +252,7 @@ export function HistoryView() {
                       border: "1px solid rgba(255,255,255,0.09)", borderTop: "1px solid rgba(255,255,255,0.17)",
                       boxShadow: "0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.07)",
                     }}>
-                      <CryptoIcon symbol={tx.asset} size={20} />
+                      <CryptoIcon symbol={tx.asset} image={tx.tokenImage} size={20} />
                     </div>
 
                     {/* Info */}
@@ -182,10 +283,10 @@ export function HistoryView() {
                         {tx.type === "receive" ? "+" : "−"}{formatCrypto(tx.amount, 6)} {tx.asset}
                       </div>
                       <div style={{ fontSize: 11, color: "rgba(255,255,255,0.24)", fontVariantNumeric: "tabular-nums" }}>
-                        {tx.amountUSD > 0.001 ? formatUSD(tx.amountUSD) : formatTime(tx.date)}
+                        {tx.amountUSD > 0.001 ? formatUSD(tx.amountUSD) : formatDate(tx.date)}
                       </div>
                     </div>
-                  </motion.div>
+                  </motion.button>
                   {idx < txs.length - 1 && <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "0 18px" }} />}
                 </div>
               ))}
@@ -193,6 +294,9 @@ export function HistoryView() {
           </motion.div>
         ))
       )}
+      <AnimatePresence>
+        {selectedTx && <TxDetailsModal tx={selectedTx} onClose={() => setSelectedTx(null)} />}
+      </AnimatePresence>
     </motion.div>
   );
 }
