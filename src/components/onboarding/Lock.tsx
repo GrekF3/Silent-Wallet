@@ -24,8 +24,8 @@ export function Lock({ onUnlock }: { onUnlock: () => void }) {
       const addresses = deriveAddresses(mnemonic);
       setSession(mnemonic, addresses);
       onUnlock();
-    } catch {
-      setError("Wrong password");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Wrong password");
     } finally {
       setLoading(false);
     }
