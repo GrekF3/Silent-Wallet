@@ -7,18 +7,27 @@ import type { WalletAddresses } from "./wallet";
 const KEY     = "silent_session_v1";
 const TIMEOUT = 10 * 60 * 1000; // 10 minutes
 
+export type SessionMode = "wallet" | "watch";
+
 type Session = {
-  mnemonic:     string;
+  mode?:        SessionMode;
+  watchName?:   string;
+  mnemonic:     string | null;
   addresses:    WalletAddresses;
   lastActivity: number;
 };
 
 export function saveSession(mnemonic: string, addresses: WalletAddresses): void {
-  const s: Session = { mnemonic, addresses, lastActivity: Date.now() };
+  const s: Session = { mode: "wallet", mnemonic, addresses, lastActivity: Date.now() };
   sessionStorage.setItem(KEY, JSON.stringify(s));
 }
 
-export function readSession(): { mnemonic: string; addresses: WalletAddresses } | null {
+export function saveWatchSession(watchName: string, addresses: WalletAddresses): void {
+  const s: Session = { mode: "watch", watchName, mnemonic: null, addresses, lastActivity: Date.now() };
+  sessionStorage.setItem(KEY, JSON.stringify(s));
+}
+
+export function readSession(): { mode: SessionMode; watchName?: string; mnemonic: string | null; addresses: WalletAddresses } | null {
   try {
     const raw = sessionStorage.getItem(KEY);
     if (!raw) return null;
@@ -27,7 +36,7 @@ export function readSession(): { mnemonic: string; addresses: WalletAddresses } 
       sessionStorage.removeItem(KEY);
       return null;
     }
-    return { mnemonic: s.mnemonic, addresses: s.addresses };
+    return { mode: s.mode ?? "wallet", watchName: s.watchName, mnemonic: s.mnemonic, addresses: s.addresses };
   } catch { return null; }
 }
 

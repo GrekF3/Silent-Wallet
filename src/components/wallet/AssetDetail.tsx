@@ -57,7 +57,7 @@ function BigChart({ data, width = 580, height = 140, positive }: { data: number[
 }
 
 export function AssetDetail() {
-  const { selectedAsset, closeAsset, setView, transactions } = useWalletStore();
+  const { selectedAsset, closeAsset, setView, transactions, sessionMode } = useWalletStore();
   const [period, setPeriod] = useState<Period>("1W");
   if (!selectedAsset) return null;
 
@@ -65,6 +65,7 @@ export function AssetDetail() {
   const pos = a.change24h >= 0;
   const valueLabel = a.priceUSD > 0 ? formatUSD(a.balance * a.priceUSD) : (a.balance > 0 ? "Pricing..." : formatUSD(0));
   const txs = transactions.filter((t) => t.asset === a.symbol).slice(0, 4);
+  const watchOnly = sessionMode === "watch";
 
   return (
     <motion.div
@@ -182,14 +183,16 @@ export function AssetDetail() {
       </div>
 
       {/* ── Actions ────────────────────────────────────────────── */}
-      <div style={{ display: "flex", gap: 10 }}>
-        <GlassButton variant="primary" size="lg" style={{ flex: 1 }} onClick={() => setView("transfer")}>
-          <Icons.send size={15} color="#000" /> Send
-        </GlassButton>
-        <GlassButton variant="default" size="lg" style={{ flex: 1 }} onClick={() => setView("transfer")}>
-          <Icons.receive size={15} /> Receive
-        </GlassButton>
-      </div>
+      {!watchOnly && (
+        <div style={{ display: "flex", gap: 10 }}>
+          <GlassButton variant="primary" size="lg" style={{ flex: 1 }} onClick={() => setView("transfer")}>
+            <Icons.send size={15} color="#000" /> Send
+          </GlassButton>
+          <GlassButton variant="default" size="lg" style={{ flex: 1 }} onClick={() => setView("transfer")}>
+            <Icons.receive size={15} /> Receive
+          </GlassButton>
+        </div>
+      )}
 
       {/* ── Recent activity ────────────────────────────────────── */}
       {txs.length > 0 && (

@@ -12,6 +12,7 @@ import { readCacheAny, writeCache } from "./cache";
 import { setWalletRefreshHandler } from "./walletRefresh";
 
 const FETCH_TIMEOUT = 12_000;
+const EMPTY_EVM = "0x0000000000000000000000000000000000000000";
 
 let activeRefresh = false;
 let hydratedCacheKey = "";
@@ -63,9 +64,30 @@ function mergePrices(fresh: Prices | null, previous: Prices | null): Prices {
   return merged;
 }
 
+function skipped<T>(value: T): LoadResult<T> {
+  return { ok: true, value };
+}
+
+function validEvm(address: string | undefined) {
+  return !!address && address !== EMPTY_EVM && /^0x[0-9a-fA-F]{40}$/.test(address);
+}
+
+function validBtc(address: string | undefined) {
+  return !!address && /^(bc1|tb1|[13mn2])[a-zA-HJ-NP-Z0-9]{25,80}$/.test(address);
+}
+
+function validSol(address: string | undefined) {
+  return !!address && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address);
+}
+
+function cacheAddress(addresses: { ethereum: string; bitcoin: string; solana: string }, mode: string) {
+  const address = validEvm(addresses.ethereum) ? addresses.ethereum : (addresses.bitcoin || addresses.solana || addresses.ethereum);
+  return `${mode}:${address}`;
+}
+
 export function useChainData() {
   const {
-    addresses, network, mnemonic,
+    addresses, network, mnemonic, sessionMode,
     setAssets, setTokens, setTxs, setPrices,
     setLoading, setInitialLoaded, setSourceState, markUpdated,
   } = useWalletStore();
@@ -94,23 +116,35 @@ export function useChainData() {
       });
 
       const bitcoinAddress = mnemonic ? bitcoinAddressForNetwork(mnemonic, network) : addresses.bitcoin;
+      const hasEth = validEvm(addresses.ethereum);
+      const hasBsc = validEvm(addresses.bsc);
+      const hasBtc = validBtc(bitcoinAddress);
+      const hasSol = validSol(addresses.solana);
       const [ethBal, bnbBal, btcBal, solBal] = await Promise.all([
-        loadWithTimeout(getEthBalance(addresses.ethereum, network), FETCH_TIMEOUT),
-        loadWithTimeout(getBnbBalance(addresses.bsc, network), FETCH_TIMEOUT),
-        loadWithTimeout(getBtcBalance(bitcoinAddress, network), FETCH_TIMEOUT),
-        loadWithTimeout(getSolBalance(addresses.solana, network), FETCH_TIMEOUT),
+        hasEth ? loadWithTimeout(getEthBalance(addresses.ethereum, network), FETCH_TIMEOUT) : skipped(0),
+        hasBsc ? loadWithTimeout(getBnbBalance(addresses.bsc, network), FETCH_TIMEOUT) : skipped(0),
+        hasBtc ? loadWithTimeout(getBtcBalance(bitcoinAddress, network), FETCH_TIMEOUT) : skipped(0),
+        hasSol ? loadWithTimeout(getSolBalance(addresses.solana, network), FETCH_TIMEOUT) : skipped(0),
       ]);
 
       const prevAssets = useWalletStore.getState().assets;
       const safeBal = (fresh: LoadResult<number>, id: string) =>
         fresh.ok ? fresh.value : (prevAssets.find((a) => a.id === id)?.balance ?? 0);
 
-      const assets: AssetInfo[] = [
+      const allNativeAssets: AssetInfo[] = [
         { id: "eth", symbol: "ETH", name: "Ethereum", network: "ethereum", balance: safeBal(ethBal, "eth"), priceUSD: prices.ETH?.usd ?? 0, change24h: prices.ETH?.usd_24h_change ?? 0, change7d: prices.ETH?.usd_7d_change ?? 0, spark7d: prices.ETH?.spark7d ?? [], image: prices.ETH?.image ?? "", desc: "Smart contract platform" },
         { id: "btc", symbol: "BTC", name: "Bitcoin",  network: "bitcoin",  balance: safeBal(btcBal, "btc"), priceUSD: prices.BTC?.usd ?? 0, change24h: prices.BTC?.usd_24h_change ?? 0, change7d: prices.BTC?.usd_7d_change ?? 0, spark7d: prices.BTC?.spark7d ?? [], image: prices.BTC?.image ?? "", desc: "Original decentralised currency" },
         { id: "bnb", symbol: "BNB", name: "BNB",      network: "bsc",      balance: safeBal(bnbBal, "bnb"), priceUSD: prices.BNB?.usd ?? 0, change24h: prices.BNB?.usd_24h_change ?? 0, change7d: prices.BNB?.usd_7d_change ?? 0, spark7d: prices.BNB?.spark7d ?? [], image: prices.BNB?.image ?? "", desc: "BNB Chain native token" },
         { id: "sol", symbol: "SOL", name: "Solana",   network: "solana",   balance: safeBal(solBal, "sol"), priceUSD: prices.SOL?.usd ?? 0, change24h: prices.SOL?.usd_24h_change ?? 0, change7d: prices.SOL?.usd_7d_change ?? 0, spark7d: prices.SOL?.spark7d ?? [], image: prices.SOL?.image ?? "", desc: "High-performance L1" },
       ];
+      const assets = sessionMode === "watch"
+        ? allNativeAssets.filter((asset) =>
+          (asset.network === "ethereum" && hasEth) ||
+          (asset.network === "bsc" && hasBsc) ||
+          (asset.network === "bitcoin" && hasBtc) ||
+          (asset.network === "solana" && hasSol)
+        )
+        : allNativeAssets;
 
       setAssets(assets);
       const balanceFailures = [ethBal, bnbBal, btcBal, solBal].filter((res) => !res.ok);
@@ -137,8 +171,8 @@ export function useChainData() {
       if (network === "mainnet") {
         setSourceState("tokens", { status: "refreshing", error: undefined });
         const [evmTokens, splTokens] = await Promise.all([
-          loadWithTimeout(fetchAllEvmTokens(addresses.ethereum, addresses.bsc), 25_000),
-          loadWithTimeout(getSplTokens(addresses.solana, network), 15_000),
+          hasEth || hasBsc ? loadWithTimeout(fetchAllEvmTokens(hasEth ? addresses.ethereum : EMPTY_EVM as `0x${string}`, hasBsc ? addresses.bsc : EMPTY_EVM as `0x${string}`), 25_000) : skipped([]),
+          hasSol ? loadWithTimeout(getSplTokens(addresses.solana, network), 15_000) : skipped([]),
         ]);
         const storeSnap = useWalletStore.getState();
         const nextEvm = evmTokens.ok ? evmTokens.value : storeSnap.evmTokens;
@@ -155,7 +189,7 @@ export function useChainData() {
       }
 
       const finalSnap = useWalletStore.getState();
-      writeCache(addresses.ethereum, network, {
+      writeCache(cacheAddress(addresses, sessionMode), network, {
         assets,
         transactions: txs,
         evmTokens: finalSnap.evmTokens,
@@ -171,7 +205,7 @@ export function useChainData() {
       setLoading(false);
       activeRefresh = false;
     }
-  }, [addresses, markUpdated, mnemonic, network, setAssets, setInitialLoaded, setLoading, setPrices, setSourceState, setTokens, setTxs]);
+  }, [addresses, markUpdated, mnemonic, network, sessionMode, setAssets, setInitialLoaded, setLoading, setPrices, setSourceState, setTokens, setTxs]);
 
   useEffect(() => {
     setWalletRefreshHandler(() => refresh(false));
@@ -181,11 +215,12 @@ export function useChainData() {
   useEffect(() => {
     if (!addresses) return;
 
-    const cacheKey = `${network}:${addresses.ethereum.toLowerCase()}`;
+    const primary = cacheAddress(addresses, sessionMode);
+    const cacheKey = `${network}:${primary.toLowerCase()}`;
     let cached = null;
     if (hydratedCacheKey !== cacheKey) {
       hydratedCacheKey = cacheKey;
-      cached = readCacheAny(addresses.ethereum, network);
+      cached = readCacheAny(primary, network);
       if (cached) {
         setAssets(cached.assets);
         setTxs(cached.transactions);
@@ -198,7 +233,7 @@ export function useChainData() {
 
     const id = setInterval(() => refresh(true), 60_000);
     return () => clearInterval(id);
-  }, [addresses, network, refresh, setAssets, setInitialLoaded, setTokens, setTxs]);
+  }, [addresses, network, refresh, sessionMode, setAssets, setInitialLoaded, setTokens, setTxs]);
 
   return { refresh: () => refresh(false) };
 }

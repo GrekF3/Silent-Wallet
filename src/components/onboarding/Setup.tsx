@@ -8,9 +8,27 @@ import { Icons }       from "@/components/ui/Icon";
 import { generateMnemonic, validateMnemonic, deriveAddresses } from "@/lib/wallet";
 import { saveMnemonic } from "@/lib/storage";
 import { useWalletStore } from "@/lib/store";
+import type { WalletAddresses } from "@/lib/wallet";
 
-type Tab  = "create" | "import";
+type Tab  = "create" | "import" | "watch";
 type Step = "start" | "phrase" | "confirm" | "password";
+
+const EMPTY_EVM = "0x0000000000000000000000000000000000000000" as const;
+
+function watchAddresses(address: string): WalletAddresses | null {
+  const value = address.trim();
+  if (/^0x[0-9a-fA-F]{40}$/.test(value)) {
+    const evm = value as `0x${string}`;
+    return { ethereum: evm, bsc: evm, bitcoin: "", solana: "" };
+  }
+  if (/^(bc1|tb1|[13mn2])[a-zA-HJ-NP-Z0-9]{25,80}$/.test(value)) {
+    return { ethereum: EMPTY_EVM, bsc: EMPTY_EVM, bitcoin: value, solana: "" };
+  }
+  if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value)) {
+    return { ethereum: EMPTY_EVM, bsc: EMPTY_EVM, bitcoin: "", solana: value };
+  }
+  return null;
+}
 
 function WordGrid({ words }: { words: string[] }) {
   return (
@@ -32,11 +50,13 @@ function WordGrid({ words }: { words: string[] }) {
 }
 
 export function Setup({ onDone }: { onDone: () => void }) {
-  const { setSession } = useWalletStore();
+  const { setSession, setWatchSession } = useWalletStore();
   const [tab,      setTab]      = useState<Tab>("create");
   const [step,     setStep]     = useState<Step>("start");
   const [mnemonic, setMnemonic] = useState("");
   const [importInput, setImport] = useState("");
+  const [watchName, setWatchName] = useState("");
+  const [watchAddress, setWatchAddress] = useState("");
   const [password, setPassword] = useState("");
   const [password2, setPassword2] = useState("");
   const [error,    setError]    = useState("");
@@ -73,6 +93,15 @@ export function Setup({ onDone }: { onDone: () => void }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleWatch = () => {
+    const addresses = watchAddresses(watchAddress);
+    const name = watchName.trim();
+    if (!name) { setError("Name is required"); return; }
+    if (!addresses) { setError("Enter a valid Ethereum, BNB Chain, Bitcoin, or Solana address"); return; }
+    setWatchSession(name, addresses);
+    onDone();
   };
 
   const copy = () => {
@@ -112,7 +141,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
             <motion.div key="start" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               {/* Tabs */}
               <div style={{ display: "flex", padding: 3, borderRadius: 14, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", marginBottom: 20 }}>
-                {(["create","import"] as Tab[]).map((t) => {
+                {(["create","import","watch"] as Tab[]).map((t) => {
                   const active = tab === t;
                   return (
                     <div key={t} style={{ position: "relative", flex: 1 }}>
@@ -123,7 +152,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
                       )}
                       <button onClick={() => { setTab(t); setError(""); }}
                         style={{ position: "relative", zIndex: 1, width: "100%", height: 40, borderRadius: 11, border: "none", background: "transparent", cursor: "pointer", fontSize: 14, fontWeight: 500, fontFamily: "inherit", color: active ? "#fff" : "rgba(255,255,255,0.35)", transition: "color 0.15s" }}>
-                        {t === "create" ? "Create Wallet" : "Import Wallet"}
+                        {t === "create" ? "Create" : t === "import" ? "Import" : "Observer"}
                       </button>
                     </div>
                   );
@@ -143,7 +172,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
                       <Icons.plus size={15} color="#000" /> Generate Seed Phrase
                     </GlassButton>
                   </>
-                ) : (
+                ) : tab === "import" ? (
                   <>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       <label style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.30)" }}>
@@ -165,6 +194,31 @@ export function Setup({ onDone }: { onDone: () => void }) {
                     {error && <div style={{ fontSize: 13, color: "rgba(255,100,100,0.80)", padding: "10px 14px", borderRadius: 10, background: "rgba(255,60,60,0.07)", border: "1px solid rgba(255,60,60,0.15)" }}>{error}</div>}
                     <GlassButton variant="primary" size="lg" style={{ width: "100%" }} onClick={handleImport} disabled={!importInput.trim()}>
                       Import Wallet
+                    </GlassButton>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ display: "flex", gap: 14, padding: "16px 18px", borderRadius: 12, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                      <Icons.eye size={18} color="rgba(255,255,255,0.50)" />
+                      <p style={{ fontSize: 13, color: "rgba(255,255,255,0.50)", lineHeight: 1.5 }}>
+                        Watch-only mode tracks balances, tokens, and history for an address. Sending is disabled because no private key is stored.
+                      </p>
+                    </div>
+                    <GlassInput
+                      label="Name"
+                      placeholder="Main account"
+                      value={watchName}
+                      onChange={(e) => { setWatchName(e.target.value); setError(""); }}
+                    />
+                    <GlassInput
+                      label="Address"
+                      placeholder="0x…, bc1…, or Solana address"
+                      value={watchAddress}
+                      onChange={(e) => { setWatchAddress(e.target.value); setError(""); }}
+                    />
+                    {error && <div style={{ fontSize: 13, color: "rgba(255,100,100,0.80)", padding: "10px 14px", borderRadius: 10, background: "rgba(255,60,60,0.07)", border: "1px solid rgba(255,60,60,0.15)" }}>{error}</div>}
+                    <GlassButton variant="primary" size="lg" style={{ width: "100%" }} onClick={handleWatch} disabled={!watchName.trim() || !watchAddress.trim()}>
+                      <Icons.eye size={15} color="#000" /> Start Watching
                     </GlassButton>
                   </>
                 )}

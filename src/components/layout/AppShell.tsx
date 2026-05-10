@@ -20,7 +20,7 @@ const PAGE: Variants = {
 };
 
 export function AppShell({ onLock }: { onLock: () => void }) {
-  const { view, addresses, initialLoaded } = useWalletStore();
+  const { view, addresses, initialLoaded, sessionMode } = useWalletStore();
   useChainData();
   useActivityTracker(onLock);
 
@@ -28,7 +28,7 @@ export function AppShell({ onLock }: { onLock: () => void }) {
     switch (view) {
       case "dashboard": return <Dashboard />;
       case "asset":     return <AssetDetail />;
-      case "transfer":  return <TransferView />;
+      case "transfer":  return sessionMode === "watch" ? <Dashboard /> : <TransferView />;
       case "history":   return <HistoryView />;
       case "settings":  return <SettingsView />;
     }

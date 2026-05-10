@@ -18,12 +18,13 @@ const NAV: NavItem[] = [
 ];
 
 export function BottomNav() {
-  const { view, setView } = useWalletStore();
+  const { view, setView, sessionMode } = useWalletStore();
   const activeNav = (view === "asset" ? "dashboard" : view) as View;
+  const items = sessionMode === "watch" ? NAV.filter((item) => item.id !== "transfer") : NAV;
 
   return (
     <nav className="bottom-nav" aria-label="Primary mobile navigation">
-      {NAV.map((item) => {
+      {items.map((item) => {
         const Icon = Icons[item.icon];
         const active = activeNav === item.id;
         return (

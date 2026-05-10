@@ -12,6 +12,14 @@ const T = {
   label: { fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "rgba(255,255,255,0.28)", marginBottom: 10, display: "block" } as React.CSSProperties,
 };
 
+const EMPTY_EVM = "0x0000000000000000000000000000000000000000";
+
+function primaryAddress(addresses: ReturnType<typeof useWalletStore.getState>["addresses"]) {
+  if (!addresses) return "";
+  if (addresses.ethereum && addresses.ethereum !== EMPTY_EVM) return addresses.ethereum;
+  return addresses.bitcoin || addresses.solana || "";
+}
+
 function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
   return (
     <motion.button onClick={onChange} whileTap={{ scale: 0.93 }} style={{
@@ -135,8 +143,9 @@ function ResetModal({ onConfirm, onClose }: { onConfirm: () => void; onClose: ()
 }
 
 export function SettingsView() {
-  const { addresses, mnemonic, clearSession, network, setNetwork } = useWalletStore();
-  const addr  = addresses?.ethereum ?? "";
+  const { addresses, mnemonic, clearSession, network, setNetwork, sessionMode, watchName } = useWalletStore();
+  const addr  = primaryAddress(addresses);
+  const watchOnly = sessionMode === "watch";
   const toast = useToast();
 
   const [showPhrase, setShowPhrase] = useState(false);
@@ -176,7 +185,7 @@ export function SettingsView() {
               S
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: "#fff", marginBottom: 3 }}>Silent Wallet</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "#fff", marginBottom: 3 }}>{watchOnly ? (watchName ?? "Observer") : "Silent Wallet"}</div>
               <div style={{ fontSize: 12, fontFamily: "monospace", color: "rgba(255,255,255,0.35)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {shortenAddress(addr, 8)}
               </div>
@@ -227,6 +236,7 @@ export function SettingsView() {
         </div>
 
         {/* Security */}
+        {!watchOnly && (
         <div>
           <span style={T.label}>Security</span>
           <GlassCard elevated style={{ overflow: "hidden" }}>
@@ -265,6 +275,7 @@ export function SettingsView() {
             </motion.div>
           </GlassCard>
         </div>
+        )}
 
         {/* Lock button */}
         <motion.button
@@ -274,7 +285,7 @@ export function SettingsView() {
           style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "14px", borderRadius: 16, cursor: "pointer", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)", borderTop: "1px solid rgba(255,255,255,0.14)", fontFamily: "inherit", fontSize: 14, fontWeight: 500, color: "rgba(255,255,255,0.50)", transition: "background 0.15s" }}
         >
           <Icons.lock size={14} color="rgba(255,255,255,0.40)" />
-          Lock Wallet
+          {watchOnly ? "Close Observer" : "Lock Wallet"}
         </motion.button>
 
         <div style={{ fontSize: 11, color: "rgba(255,255,255,0.14)", textAlign: "center", letterSpacing: "0.04em", paddingBottom: 16 }}>

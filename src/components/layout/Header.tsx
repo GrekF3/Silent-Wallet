@@ -22,12 +22,21 @@ const ADDRESS_LABELS = {
   solana: "Solana",
 } as const;
 
+const EMPTY_EVM = "0x0000000000000000000000000000000000000000";
+
 export function Header() {
-  const { view, setView, addresses } = useWalletStore();
+  const { view, setView, addresses, sessionMode, watchName } = useWalletStore();
   const [open, setOpen] = useState(false);
   const toast = useToast();
   const activeNav = (view === "asset" ? "dashboard" : view) as View;
-  const entries = addresses ? (Object.entries(ADDRESS_LABELS) as [keyof typeof ADDRESS_LABELS, string][]) : [];
+  const navItems = sessionMode === "watch" ? NAV.filter((item) => item.id !== "transfer") : NAV;
+  const entries = addresses
+    ? (Object.entries(ADDRESS_LABELS) as [keyof typeof ADDRESS_LABELS, string][])
+      .filter(([key]) => {
+        const value = addresses[key];
+        return value && value !== EMPTY_EVM;
+      })
+    : [];
 
   const copyAddress = async (address: string, label: string) => {
     await navigator.clipboard.writeText(address);
@@ -57,10 +66,15 @@ export function Header() {
         style={{ display: "flex", alignItems: "center", cursor: "pointer", background: "none", border: "none", flexShrink: 0, padding: 0 }}
       >
         <span style={{ fontSize: 16, fontWeight: 650, color: "rgba(255,255,255,0.88)", letterSpacing: 0 }}>Silent</span>
+        {sessionMode === "watch" && (
+          <span className="topbar-watch-badge" style={{ marginLeft: 9, padding: "2px 7px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.42)", fontSize: 10, fontWeight: 650 }}>
+            Watch
+          </span>
+        )}
       </button>
 
       <nav className="desktop-nav" style={{ display: "flex", alignItems: "center", gap: 2, flex: 1 }}>
-        {NAV.map((item) => {
+        {navItems.map((item) => {
           const active = activeNav === item.id;
           return (
             <div key={item.id} style={{ position: "relative" }}>
@@ -140,8 +154,10 @@ export function Header() {
                 }}
               >
                 <div style={{ padding: "12px 14px 10px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                  <div style={{ fontSize: 12, fontWeight: 650, color: "#fff" }}>Wallet addresses</div>
-                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.30)", marginTop: 2 }}>Copy an address for a specific network</div>
+                  <div style={{ fontSize: 12, fontWeight: 650, color: "#fff" }}>{sessionMode === "watch" ? (watchName ?? "Observer") : "Wallet addresses"}</div>
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.30)", marginTop: 2 }}>
+                    {sessionMode === "watch" ? "Watch-only address" : "Copy an address for a specific network"}
+                  </div>
                 </div>
                 {entries.map(([key, label]) => {
                   const value = addresses[key];

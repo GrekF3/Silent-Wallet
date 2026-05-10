@@ -36,6 +36,8 @@ const NET_SHORT: Record<WalletNetwork, string> = {
   solana: "SOL",
 };
 
+const EMPTY_EVM = "0x0000000000000000000000000000000000000000";
+
 type DisplayAsset = {
   id: string;
   symbol: string;
@@ -302,6 +304,7 @@ const up: Variants = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, 
 export function Dashboard() {
   const {
     assets, evmTokens, splTokens, addresses, loading, initialLoaded, loadingState, lastUpdated, setView, openAsset,
+    sessionMode, watchName,
     privacyMode, setPrivacyMode, hideZeroBalances, setHideZeroBalances, hiddenAssetIds,
   } = useWalletStore();
   const toast = useToast();
@@ -374,7 +377,12 @@ export function Dashboard() {
   const partialErrors = Object.entries(loadingState)
     .filter(([, state]) => state.status === "partial" || state.status === "error")
     .map(([source]) => source);
-  const addr = addresses?.ethereum ?? null;
+  const addr = addresses
+    ? addresses.ethereum && addresses.ethereum !== EMPTY_EVM
+      ? addresses.ethereum
+      : addresses.bitcoin || addresses.solana || null
+    : null;
+  const watchOnly = sessionMode === "watch";
 
   return (
     <motion.div className="view-shell" variants={stagger} initial="hidden" animate="show"
@@ -386,8 +394,13 @@ export function Dashboard() {
       <motion.div variants={up}>
         <div className="dashboard-hero-row" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10, flexWrap: "wrap" }}>
               <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.28)" }}>Total Portfolio</span>
+              {watchOnly && (
+                <span style={{ fontSize: 10, fontWeight: 650, padding: "2px 7px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.42)" }}>
+                  Observer{watchName ? ` · ${watchName}` : ""}
+                </span>
+              )}
               <button type="button" onClick={() => setPrivacyMode(!privacyMode)} title={privacyMode ? "Show balance" : "Hide balance"} style={{ width: 28, height: 28, borderRadius: 9, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.045)", color: "rgba(255,255,255,0.46)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
                 {privacyMode ? <Icons.eyeOff size={14} /> : <Icons.eye size={14} />}
               </button>
@@ -428,10 +441,12 @@ export function Dashboard() {
               </div>
             )}
           </div>
-          <div className="dashboard-actions" style={{ display: "flex", gap: 8, paddingTop: 4, flexShrink: 0 }}>
-            <GlassButton variant="primary" size="md" onClick={() => setView("transfer")}><Icons.send size={13} color="#000" /> Send</GlassButton>
-            <GlassButton variant="default" size="md" onClick={() => setView("transfer")}><Icons.receive size={13} /> Receive</GlassButton>
-          </div>
+          {!watchOnly && (
+            <div className="dashboard-actions" style={{ display: "flex", gap: 8, paddingTop: 4, flexShrink: 0 }}>
+              <GlassButton variant="primary" size="md" onClick={() => setView("transfer")}><Icons.send size={13} color="#000" /> Send</GlassButton>
+              <GlassButton variant="default" size="md" onClick={() => setView("transfer")}><Icons.receive size={13} /> Receive</GlassButton>
+            </div>
+          )}
         </div>
       </motion.div>
 

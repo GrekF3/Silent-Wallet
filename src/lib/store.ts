@@ -5,7 +5,7 @@ import type { Prices } from "./prices";
 import type { ChainTx, Network } from "./chains";
 import type { EvmToken } from "./tokens";
 import type { SplToken } from "./solana";
-import { saveSession, clearSession as clearSess } from "./session";
+import { saveSession, saveWatchSession, clearSession as clearSess, type SessionMode } from "./session";
 
 export type View = "dashboard" | "transfer" | "history" | "settings" | "asset";
 export type LoadStatus = "idle" | "loading" | "refreshing" | "ready" | "partial" | "error";
@@ -71,9 +71,12 @@ function writePrefs(prefs: WalletPrefs) {
 }
 
 type WalletStore = {
+  sessionMode:   SessionMode;
+  watchName:     string | null;
   mnemonic:      string | null;
   addresses:     WalletAddresses | null;
   setSession:    (m: string, a: WalletAddresses) => void;
+  setWatchSession: (name: string, a: WalletAddresses) => void;
   clearSession:  () => void;
 
   network:       Network;
@@ -118,10 +121,13 @@ type WalletStore = {
 const initialPrefs = readPrefs();
 
 export const useWalletStore = create<WalletStore>((set) => ({
+  sessionMode: "wallet",
+  watchName: null,
   mnemonic:  null,
   addresses: null,
-  setSession: (mnemonic, addresses) => { saveSession(mnemonic, addresses); set({ mnemonic, addresses }); },
-  clearSession: () => { clearSess(); set({ mnemonic: null, addresses: null, assets: [], evmTokens: [], splTokens: [], transactions: [], selectedAssetRef: null, selectedAsset: null, initialLoaded: false, lastUpdated: null }); },
+  setSession: (mnemonic, addresses) => { saveSession(mnemonic, addresses); set({ sessionMode: "wallet", watchName: null, mnemonic, addresses }); },
+  setWatchSession: (watchName, addresses) => { saveWatchSession(watchName, addresses); set({ sessionMode: "watch", watchName, mnemonic: null, addresses, view: "dashboard" }); },
+  clearSession: () => { clearSess(); set({ sessionMode: "wallet", watchName: null, mnemonic: null, addresses: null, assets: [], evmTokens: [], splTokens: [], transactions: [], selectedAssetRef: null, selectedAsset: null, initialLoaded: false, lastUpdated: null }); },
 
   network:    "mainnet",
   setNetwork: (network) => set({ network, assets: [], evmTokens: [], splTokens: [], transactions: [], selectedAssetRef: null, selectedAsset: null, initialLoaded: false, lastUpdated: null }),

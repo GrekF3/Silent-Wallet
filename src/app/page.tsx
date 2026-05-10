@@ -11,7 +11,7 @@ import { useWalletStore } from "@/lib/store";
 type Screen = "loading" | "setup" | "lock" | "app";
 
 export default function Home() {
-  const { addresses, setSession } = useWalletStore();
+  const { addresses, setSession, setWatchSession } = useWalletStore();
   const [screen, setScreen] = useState<Screen>("loading");
 
   const goLock = useCallback(() => setScreen("lock"), []);
@@ -25,7 +25,11 @@ export default function Home() {
     // 2. Check sessionStorage — valid within 10 min
     const sess = !addresses ? readSession() : null;
     if (sess && !addresses) {
-      setSession(sess.mnemonic, sess.addresses);
+      if (sess.mode === "watch") {
+        setWatchSession(sess.watchName ?? "Observer", sess.addresses);
+      } else if (sess.mnemonic) {
+        setSession(sess.mnemonic, sess.addresses);
+      }
       nextScreen = "app";
     }
 
@@ -33,7 +37,7 @@ export default function Home() {
     if (!addresses && !sess && hasWallet()) nextScreen = "lock";
 
     queueMicrotask(() => setScreen(nextScreen));
-  }, [addresses, setSession]);
+  }, [addresses, setSession, setWatchSession]);
 
   if (screen === "loading") {
     return <AppPreloader label="Opening wallet" />;
