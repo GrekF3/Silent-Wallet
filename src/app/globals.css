@@ -1,0 +1,133 @@
+@import "tailwindcss";
+
+/* ─── Tokens ────────────────────────────────────────────────── */
+:root {
+  --bg:          #080808;
+  --sidebar-w:   68px;
+
+  /* Glass fills */
+  --glass-xs:   rgba(255,255,255,0.03);
+  --glass-sm:   rgba(255,255,255,0.055);
+  --glass-md:   rgba(255,255,255,0.08);
+  --glass-lg:   rgba(255,255,255,0.11);
+
+  /* Borders */
+  --b-dim:      rgba(255,255,255,0.07);
+  --b-soft:     rgba(255,255,255,0.11);
+  --b-bright:   rgba(255,255,255,0.20);
+
+  /* The money shot — inner highlight simulates light from top */
+  --card-shadow:
+    0 1px 3px  rgba(0,0,0,0.55),
+    0 4px 12px rgba(0,0,0,0.55),
+    0 16px 40px rgba(0,0,0,0.45),
+    inset 0  1px 0 rgba(255,255,255,0.11),
+    inset 0 -1px 0 rgba(0,0,0,0.18);
+
+  --card-shadow-hover:
+    0 2px 6px  rgba(0,0,0,0.60),
+    0 8px 24px rgba(0,0,0,0.60),
+    0 24px 56px rgba(0,0,0,0.50),
+    inset 0  1px 0 rgba(255,255,255,0.18),
+    inset 0 -1px 0 rgba(0,0,0,0.22);
+
+  --card-shadow-elevated:
+    0 0 0 1px rgba(255,255,255,0.07),
+    0 2px 6px  rgba(0,0,0,0.65),
+    0 10px 32px rgba(0,0,0,0.65),
+    0 32px 72px rgba(0,0,0,0.55),
+    inset 0  1px 0 rgba(255,255,255,0.14),
+    inset 0 -1px 0 rgba(0,0,0,0.22);
+}
+
+/* ─── Reset ─────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: #fff;
+  font-family: 'Inter', ui-sans-serif, -apple-system, 'SF Pro Display', sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* ─── Glass card ────────────────────────────────────────────── */
+.card {
+  background:    var(--glass-sm);
+  border:        1px solid var(--b-soft);
+  border-top-color: var(--b-bright);
+  border-radius: 20px;
+  box-shadow:    var(--card-shadow);
+  backdrop-filter: blur(32px) saturate(160%);
+  -webkit-backdrop-filter: blur(32px) saturate(160%);
+}
+
+.card-hover {
+  transition: background 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  cursor: pointer;
+}
+.card-hover:hover {
+  background:    var(--glass-md);
+  border-top-color: rgba(255,255,255,0.28);
+  box-shadow:    var(--card-shadow-hover);
+}
+
+.card-elevated {
+  box-shadow: var(--card-shadow-elevated);
+}
+
+/* ─── Sidebar surface ───────────────────────────────────────── */
+.sidebar {
+  width:         var(--sidebar-w);
+  min-width:     var(--sidebar-w);
+  max-width:     var(--sidebar-w);
+  background:    rgba(255,255,255,0.025);
+  border-right:  1px solid rgba(255,255,255,0.07);
+  backdrop-filter: blur(48px);
+  -webkit-backdrop-filter: blur(48px);
+}
+
+/* ─── Typography ────────────────────────────────────────────── */
+.label {
+  display:        block;
+  font-size:      11px;
+  font-weight:    500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color:          rgba(255,255,255,0.32);
+  line-height:    1;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "ss01" 1;
+}
+
+/* ─── Divider ───────────────────────────────────────────────── */
+.divider {
+  height:     1px;
+  background: rgba(255,255,255,0.06);
+  margin:     0 20px;
+}
+
+/* ─── Scrollbar ─────────────────────────────────────────────── */
+::-webkit-scrollbar        { width: 4px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: rgba(255,255,255,0.09); border-radius: 2px; }
+
+/* ─── Focus ─────────────────────────────────────────────────── */
+:focus-visible {
+  outline:        1.5px solid rgba(255,255,255,0.35);
+  outline-offset: 2px;
+  border-radius:  10px;
+}
+
+::selection { background: rgba(255,255,255,0.14); }
