@@ -40,8 +40,8 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Silent Wallet ${{ github.ref_name }}"
-          releaseDraft: true
-          prerelease: true
+          releaseDraft: false
+          prerelease: false
           args: ${{ matrix.args }}
 
   android:
