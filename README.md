@@ -1,4 +1,4 @@
-# Silent Wallet
+# Silent Wallet - **Open Source Crypto Wallet**
 
 Open-source self-custodial crypto wallet for ETH, BTC, BNB Chain, and Solana.
 
