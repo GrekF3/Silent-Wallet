@@ -82,7 +82,16 @@ jobs:
           set -euo pipefail
           tag="${{ github.ref_name }}"
           mkdir -p release-assets platform-assets
-          gh release download "$tag" --dir release-assets
+
+          for attempt in {1..12}; do
+            if gh release view "$tag" --repo "$GH_REPO" >/dev/null; then
+              break
+            fi
+            sleep 5
+          done
+
+          gh release view "$tag" --repo "$GH_REPO" >/dev/null
+          gh release download "$tag" --repo "$GH_REPO" --dir release-assets
 
           cp android-artifact/*.apk platform-assets/Silent-Wallet-android-debug.apk
 
@@ -105,6 +114,7 @@ jobs:
             cp "${mac_app[0]}" platform-assets/Silent-Wallet-mac-universal.app.tar.gz
           fi
 
-          gh release upload "$tag" platform-assets/* --clobber
+          gh release upload "$tag" platform-assets/* --repo "$GH_REPO" --clobber
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
