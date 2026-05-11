@@ -69,7 +69,7 @@ jobs:
           path: android/app/build/outputs/apk/debug/*.apk
 
   android-release-asset:
-    name: Android release asset
+    name: Platform release assets
     needs: [desktop, android]
     runs-on: ubuntu-latest
     steps:
@@ -77,6 +77,34 @@ jobs:
         with:
           name: silent-wallet-android-debug
           path: android-artifact
-      - run: gh release upload "${{ github.ref_name }}" android-artifact/*.apk --clobber
+      - name: Add platform-named release assets
+        run: |
+          set -euo pipefail
+          tag="${{ github.ref_name }}"
+          mkdir -p release-assets platform-assets
+          gh release download "$tag" --dir release-assets
+
+          cp android-artifact/*.apk platform-assets/Silent-Wallet-android-debug.apk
+
+          shopt -s nullglob
+          win_setup=(release-assets/Silent.Wallet_*_x64-setup.exe)
+          win_msi=(release-assets/Silent.Wallet_*_x64_en-US.msi)
+          mac_dmg=(release-assets/Silent.Wallet_*_universal.dmg)
+          mac_app=(release-assets/Silent.Wallet_universal.app.tar.gz)
+
+          if [ ${#win_setup[@]} -gt 0 ]; then
+            cp "${win_setup[0]}" platform-assets/Silent-Wallet-win-x64-setup.exe
+          fi
+          if [ ${#win_msi[@]} -gt 0 ]; then
+            cp "${win_msi[0]}" platform-assets/Silent-Wallet-win-x64.msi
+          fi
+          if [ ${#mac_dmg[@]} -gt 0 ]; then
+            cp "${mac_dmg[0]}" platform-assets/Silent-Wallet-mac-universal.dmg
+          fi
+          if [ ${#mac_app[@]} -gt 0 ]; then
+            cp "${mac_app[0]}" platform-assets/Silent-Wallet-mac-universal.app.tar.gz
+          fi
+
+          gh release upload "$tag" platform-assets/* --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
