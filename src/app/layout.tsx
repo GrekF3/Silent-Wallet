@@ -10,6 +10,14 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Silent — Crypto Wallet",
   description: "Minimal crypto wallet",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.png", type: "image/png", sizes: "256x256" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/icon.png",
+  },
 };
 
 export default function RootLayout({
