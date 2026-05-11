@@ -3,14 +3,25 @@ use tauri::Manager;
 
 #[tauri::command]
 fn delete_wallet_snapshot(app: tauri::AppHandle) -> Result<(), String> {
-    let path = app
-        .path()
-        .app_data_dir()
-        .map_err(|err| err.to_string())?
-        .join("silent.stronghold");
+    let mut paths = Vec::new();
 
-    if path.exists() {
-        fs::remove_file(path).map_err(|err| err.to_string())?;
+    paths.push(
+        app.path()
+            .app_local_data_dir()
+            .map_err(|err| err.to_string())?
+            .join("silent.stronghold"),
+    );
+    paths.push(
+        app.path()
+            .app_data_dir()
+            .map_err(|err| err.to_string())?
+            .join("silent.stronghold"),
+    );
+
+    for path in paths {
+        if path.exists() {
+            fs::remove_file(path).map_err(|err| err.to_string())?;
+        }
     }
 
     Ok(())

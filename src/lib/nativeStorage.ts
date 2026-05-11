@@ -14,6 +14,14 @@ function isTauriRuntime() {
   return hasWindow() && "__TAURI_INTERNALS__" in window;
 }
 
+async function strongholdSnapshotPaths(): Promise<string[]> {
+  const { appDataDir, appLocalDataDir, join } = await import("@tauri-apps/api/path");
+  return [
+    await join(await appLocalDataDir(), "silent.stronghold"),
+    await join(await appDataDir(), "silent.stronghold"),
+  ];
+}
+
 async function isCapacitorNative() {
   if (!hasWindow()) return false;
   try {
@@ -32,19 +40,24 @@ export async function readNativeSecret(password: string): Promise<string | null>
   }
 
   if (isTauriRuntime()) {
-    try {
-      const { Stronghold } = await import("@tauri-apps/plugin-stronghold");
-      const { appDataDir, join } = await import("@tauri-apps/api/path");
-      const path = await join(await appDataDir(), "silent.stronghold");
-      const stronghold = await Stronghold.load(path, password);
-      const client = await stronghold.loadClient(STRONGHOLD_CLIENT).catch(() => stronghold.createClient(STRONGHOLD_CLIENT));
-      const store = client.getStore();
-      const value = await store.get(STRONGHOLD_STORE_KEY);
-      await stronghold.unload();
-      return value ? dec.decode(value) : null;
-    } catch {
-      return null;
+    const { Stronghold } = await import("@tauri-apps/plugin-stronghold");
+
+    for (const path of await strongholdSnapshotPaths()) {
+      let stronghold: Awaited<ReturnType<typeof Stronghold.load>> | null = null;
+
+      try {
+        stronghold = await Stronghold.load(path, password);
+        const client = await stronghold.loadClient(STRONGHOLD_CLIENT).catch(() => stronghold!.createClient(STRONGHOLD_CLIENT));
+        const store = client.getStore();
+        const value = await store.get(STRONGHOLD_STORE_KEY);
+        await stronghold.unload();
+        if (value) return dec.decode(value);
+      } catch {
+        if (stronghold) await stronghold.unload().catch(() => undefined);
+      }
     }
+
+    return null;
   }
 
   return null;
@@ -60,17 +73,23 @@ export async function writeNativeSecret(payload: string, password: string): Prom
   }
 
   if (isTauriRuntime()) {
-    const { Stronghold } = await import("@tauri-apps/plugin-stronghold");
-    const { appDataDir, join } = await import("@tauri-apps/api/path");
-    const path = await join(await appDataDir(), "silent.stronghold");
-    const stronghold = await Stronghold.load(path, password);
-    const client = await stronghold.loadClient(STRONGHOLD_CLIENT).catch(() => stronghold.createClient(STRONGHOLD_CLIENT));
-    const store = client.getStore();
-    await store.insert(STRONGHOLD_STORE_KEY, Array.from(enc.encode(payload)));
-    await stronghold.save();
-    await stronghold.unload();
-    localStorage.setItem(MARKER_KEY, "1");
-    return true;
+    let stronghold: Awaited<ReturnType<(typeof import("@tauri-apps/plugin-stronghold"))["Stronghold"]["load"]>> | null = null;
+
+    try {
+      const { Stronghold } = await import("@tauri-apps/plugin-stronghold");
+      const [path] = await strongholdSnapshotPaths();
+      stronghold = await Stronghold.load(path, password);
+      const client = await stronghold.loadClient(STRONGHOLD_CLIENT).catch(() => stronghold!.createClient(STRONGHOLD_CLIENT));
+      const store = client.getStore();
+      await store.insert(STRONGHOLD_STORE_KEY, Array.from(enc.encode(payload)));
+      await stronghold.save();
+      await stronghold.unload();
+      localStorage.setItem(MARKER_KEY, "1");
+      return true;
+    } catch {
+      if (stronghold) await stronghold.unload().catch(() => undefined);
+      return false;
+    }
   }
 
   return false;
