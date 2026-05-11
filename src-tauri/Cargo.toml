@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Silent Wallet desktop shell"
 authors = ["Silent Wallet contributors"]
 license = "MIT"
-repository = "https://github.com/silent-wallet/silent-wallet"
+repository = "https://github.com/GrekF3/Silent-Wallet"
 edition = "2021"
 
 [lib]
@@ -20,4 +20,3 @@ tauri-plugin-updater = "2"
 tauri-plugin-stronghold = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-
