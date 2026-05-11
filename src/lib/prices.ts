@@ -1,3 +1,5 @@
+import { dataProxyPath } from "./api";
+
 export type CoinData = {
   usd:            number;
   usd_24h_change: number;
@@ -9,11 +11,10 @@ export type CoinData = {
 export type Prices = Record<string, CoinData>;
 
 export async function fetchPrices(): Promise<Prices> {
-  const r = await fetch("/api/prices", {
+  const r = await fetch(dataProxyPath("/api/prices"), {
     cache: "no-store",
     signal: AbortSignal.timeout(12_000),
   });
   if (!r.ok) throw new Error(`Price fetch failed: ${r.status}`);
   return await r.json() as Prices;
 }
-

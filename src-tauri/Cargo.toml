@@ -1,0 +1,23 @@
+[package]
+name = "silent-wallet"
+version = "0.1.0"
+description = "Silent Wallet desktop shell"
+authors = ["Silent Wallet contributors"]
+license = "MIT"
+repository = "https://github.com/silent-wallet/silent-wallet"
+edition = "2021"
+
+[lib]
+name = "silent_wallet_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-updater = "2"
+tauri-plugin-stronghold = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+

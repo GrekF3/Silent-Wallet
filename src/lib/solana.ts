@@ -5,6 +5,7 @@ import { sha512 } from "@noble/hashes/sha512";
 import nacl from "tweetnacl";
 import * as bip39 from "@scure/bip39";
 import { solanaRpcUrl } from "./config";
+import { dataProxyPath } from "./api";
 import type { Network } from "./chains";
 
 /* ── Base58 (inline, avoids ESM-only bs58) ───────────────────────── */
@@ -88,7 +89,7 @@ export async function getSolBalanceServer(address: string, network: Network = "m
 export async function getSolBalance(address: string, network: Network = "mainnet"): Promise<number> {
   if (typeof window !== "undefined") {
     const params = new URLSearchParams({ address, network });
-    const r = await fetch(`/api/solana/balance?${params.toString()}`, {
+    const r = await fetch(dataProxyPath(`/api/solana/balance?${params.toString()}`), {
       signal: AbortSignal.timeout(15_000),
       cache: "no-store",
     });
@@ -297,7 +298,7 @@ export async function getSplTokensServer(address: string, network: Network = "ma
 export async function getSplTokens(address: string, network: Network = "mainnet"): Promise<SplToken[]> {
   if (typeof window !== "undefined") {
     const params = new URLSearchParams({ address, network });
-    const r = await fetch(`/api/solana/tokens?${params.toString()}`, {
+    const r = await fetch(dataProxyPath(`/api/solana/tokens?${params.toString()}`), {
       signal: AbortSignal.timeout(18_000),
       cache: "no-store",
     });

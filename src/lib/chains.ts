@@ -5,6 +5,7 @@ import {
 import { mainnet, sepolia, bsc, bscTestnet } from "viem/chains";
 import { privateKeyToAccount } from "viem/accounts";
 import { rpcUrl } from "./config";
+import { dataProxyPath } from "./api";
 
 export type Network = "mainnet" | "testnet";
 
@@ -119,7 +120,7 @@ function parseTx(raw: ApiRawTx, address: string, nativeAsset: string, nativePric
 
 async function fetchTxsFromApi(address: string, chain: "eth" | "bsc"): Promise<ApiRawTx[]> {
   try {
-    const r = await fetch(`/api/txs?address=${address}&chain=${chain}`, {
+    const r = await fetch(dataProxyPath(`/api/txs?address=${address}&chain=${chain}`), {
       signal: AbortSignal.timeout(25_000),
     });
     if (!r.ok) return [];

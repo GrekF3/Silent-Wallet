@@ -7,6 +7,7 @@ import { Icons }       from "@/components/ui/Icon";
 import { useWalletStore } from "@/lib/store";
 import { shortenAddress } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
+import { deleteWallet } from "@/lib/storage";
 
 const T = {
   label: { fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "rgba(255,255,255,0.28)", marginBottom: 10, display: "block" } as React.CSSProperties,
@@ -152,8 +153,8 @@ export function SettingsView() {
   const [showReset,  setShowReset]  = useState(false);
   const [hideSmall,  setHideSmall]  = useState(false);
 
-  const handleReset = () => {
-    localStorage.clear();
+  const handleReset = async () => {
+    await deleteWallet();
     clearSession();
     setShowReset(false);
   };

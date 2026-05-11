@@ -1,36 +1,61 @@
 # Silent Wallet
 
-A premium self-custodial crypto wallet with iOS Glass / macOS design aesthetic.
+Open-source self-custodial crypto wallet for ETH, BTC, BNB Chain, and Solana.
 
-## Features
+## Status
 
-- **Multi-chain** — ETH, BTC, BNB, SOL
-- **ERC-20 / BEP-20 / SPL tokens** — auto-discovered, real prices via CoinGecko
-- **Transaction history** — powered by Ankr Advanced API (real on-chain data)
-- **Send & Receive** — native assets + ERC-20/BEP-20 tokens with QR codes
-- **Session security** — AES-GCM + PBKDF2 (200k iterations), 10-min auto-lock
-- **Testnet support** — Sepolia, BSC Testnet with faucet links
-- **Instant load** — stale-while-revalidate cache, background refresh
+Beta. The wallet already supports create/import, Observer watch-only mode, privacy balance hiding, balances, prices, token discovery, transaction history, receive, send, testnets, lock/reset, and local encryption.
 
-## Stack
+## Architecture
 
-- Next.js 15 (App Router) + TypeScript
-- Tailwind CSS v4 + Framer Motion
-- viem v2 — EVM transactions
-- @scure/bip39, @scure/bip32, @scure/btc-signer — BTC derivation
-- tweetnacl + @noble/hashes — Solana SLIP-0010 derivation
-- Docker Compose
+- **Wallet app:** Next.js + React + TypeScript.
+- **Desktop shell:** Tauri 2 for macOS and Windows.
+- **Mobile shell:** Capacitor for iOS and Android.
+- **Data proxy:** Next.js route handlers under `src/app/api/*`.
 
-## Run
+Seed phrases and private keys stay on the device. The data proxy only receives public addresses, chain/network parameters, and price/history queries.
+
+## Storage
+
+- Web development uses encrypted browser storage.
+- Android/iOS use Capacitor Secure Storage.
+- Desktop uses Tauri Stronghold for the encrypted wallet payload.
+- The live unlocked session is intentionally short-lived and cleared on lock/timeout.
+
+## Development
 
 ```bash
-docker compose -f docker-compose.dev.yml up --build
+npm ci
+npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open `http://localhost:3000`.
+
+## Builds
+
+```bash
+npm run lint
+npm run typecheck
+npm run build:web
+npm run build:app
+npm run tauri:build
+npm run cap:sync
+```
+
+Native app builds should set `NEXT_PUBLIC_DATA_PROXY_URL` to the hosted data proxy URL, for example:
+
+```bash
+NEXT_PUBLIC_DATA_PROXY_URL=https://api.silent.example npm run build:app
+```
+
+## Releases
+
+Tagged releases (`v*.*.*`) run GitHub Actions to build desktop artifacts and an Android beta artifact. Desktop auto-update uses Tauri's updater manifest from GitHub Releases. Replace `REPLACE_WITH_TAURI_UPDATER_PUBLIC_KEY` in `src-tauri/tauri.conf.json` before publishing signed releases.
 
 ## Security
 
-Private keys are derived client-side from a BIP39 mnemonic. The mnemonic is encrypted with AES-GCM and stored in `localStorage`. The decrypted mnemonic lives only in `sessionStorage` and clears after 10 min of inactivity.
+Never share your secret recovery phrase. See `SECURITY.md` for reporting and scope.
 
-**Never share your secret recovery phrase.**
+## License
+
+MIT

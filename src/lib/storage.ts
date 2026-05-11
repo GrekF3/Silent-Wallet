@@ -2,6 +2,7 @@
 import nacl from "tweetnacl";
 import { pbkdf2 } from "@noble/hashes/pbkdf2.js";
 import { sha256 } from "@noble/hashes/sha2.js";
+import { deleteNativeSecret, hasNativeWalletMarker, readNativeSecret, writeNativeSecret } from "./nativeStorage";
 
 const STORAGE_KEY = "silent_wallet_v1";
 const enc = new TextEncoder();
@@ -69,7 +70,8 @@ export async function saveMnemonic(mnemonic: string, password: string): Promise<
       nonce: Array.from(nonce),
       ct: Array.from(ct),
     };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    const encoded = JSON.stringify(payload);
+    if (!(await writeNativeSecret(encoded, password))) localStorage.setItem(STORAGE_KEY, encoded);
     return;
   }
 
@@ -84,11 +86,12 @@ export async function saveMnemonic(mnemonic: string, password: string): Promise<
     iv:   Array.from(iv),
     ct:   Array.from(new Uint8Array(ct)),
   };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  const encoded = JSON.stringify(payload);
+  if (!(await writeNativeSecret(encoded, password))) localStorage.setItem(STORAGE_KEY, encoded);
 }
 
 export async function loadMnemonic(password: string): Promise<string> {
-  const raw = localStorage.getItem(STORAGE_KEY);
+  const raw = await readNativeSecret(password) ?? localStorage.getItem(STORAGE_KEY);
   if (!raw) throw new Error("No wallet found");
 
   const payload = JSON.parse(raw) as LegacyPayload | SecretboxPayload | (LegacyPayload & { v?: 1; alg?: string });
@@ -120,9 +123,10 @@ export async function loadMnemonic(password: string): Promise<string> {
 }
 
 export function hasWallet(): boolean {
-  return !!localStorage.getItem(STORAGE_KEY);
+  return !!localStorage.getItem(STORAGE_KEY) || hasNativeWalletMarker();
 }
 
-export function deleteWallet(): void {
+export async function deleteWallet(): Promise<void> {
   localStorage.removeItem(STORAGE_KEY);
+  await deleteNativeSecret();
 }
