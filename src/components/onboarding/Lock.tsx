@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { GlassCard }   from "@/components/ui/GlassCard";
 import { GlassButton } from "@/components/ui/GlassButton";
 import { GlassInput }  from "@/components/ui/GlassInput";
-import { Icons }       from "@/components/ui/Icon";
+import { BrandLogo } from "@/components/ui/BrandLogo";
 import { loadMnemonic, deleteWallet } from "@/lib/storage";
 import { deriveAddresses } from "@/lib/wallet";
 import { useWalletStore }  from "@/lib/store";
@@ -46,13 +46,9 @@ export function Lock({ onUnlock }: { onUnlock: () => void }) {
         initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
         style={{ width: "100%", maxWidth: 360, display: "flex", flexDirection: "column", gap: 24, position: "relative", zIndex: 1 }}
       >
-        {/* Logo */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, marginBottom: 8 }}>
-          <div style={{ width: 52, height: 52, borderRadius: 16, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.9)" }}>
-            <Icons.lock size={22} color="#000" />
-          </div>
+          <BrandLogo size={58} label="Silent Wallet" orientation="column" />
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 20, fontWeight: 300, color: "#fff" }}>Silent Wallet</div>
             <div style={{ fontSize: 13, color: "rgba(255,255,255,0.28)", marginTop: 4 }}>Enter password to unlock</div>
           </div>
         </div>

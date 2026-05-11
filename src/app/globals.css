@@ -134,6 +134,111 @@ body {
 
 ::selection { background: rgba(255,255,255,0.14); }
 
+/* ─── Brand logo ─────────────────────────────────────────────── */
+.brand-logo {
+  --brand-logo-size: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: var(--brand-logo-size);
+  color: #fff;
+}
+
+.brand-logo-column {
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+}
+
+.brand-logo-mark {
+  width: var(--brand-logo-size);
+  height: var(--brand-logo-size);
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.brand-logo-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter:
+    drop-shadow(0 10px 28px rgba(0,0,0,0.82))
+    drop-shadow(0 0 18px rgba(255,255,255,0.14));
+  transition: transform 180ms ease, filter 180ms ease;
+}
+
+.brand-logo-copy {
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  transform: translateX(-6px);
+  white-space: nowrap;
+  transition: max-width 220ms ease, opacity 180ms ease, transform 220ms ease;
+}
+
+.brand-logo-column .brand-logo-copy {
+  text-align: center;
+  transform: translateY(-4px);
+}
+
+.brand-logo-text {
+  display: block;
+  color: rgba(255,255,255,0.92);
+  font-size: 15px;
+  font-weight: 680;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.brand-logo-caption {
+  display: block;
+  margin-top: 5px;
+  color: rgba(255,255,255,0.34);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.brand-logo:hover .brand-logo-mark img,
+.brand-logo:focus-within .brand-logo-mark img,
+.topbar-brand:hover .brand-logo-mark img,
+.topbar-brand:focus-visible .brand-logo-mark img {
+  transform: scale(1.04);
+  filter:
+    drop-shadow(0 10px 28px rgba(0,0,0,0.82))
+    drop-shadow(0 0 24px rgba(255,255,255,0.24));
+}
+
+.brand-logo:hover .brand-logo-copy,
+.brand-logo:focus-within .brand-logo-copy,
+.topbar-brand:hover .brand-logo-copy,
+.topbar-brand:focus-visible .brand-logo-copy,
+.brand-logo-always .brand-logo-copy {
+  max-width: 220px;
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.brand-logo-column:hover .brand-logo-copy,
+.brand-logo-column:focus-within .brand-logo-copy,
+.brand-logo-column.brand-logo-always .brand-logo-copy {
+  transform: translateY(0);
+}
+
+@media (hover: none) {
+  .brand-logo-hover .brand-logo-copy {
+    max-width: 220px;
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .brand-logo-column.brand-logo-hover .brand-logo-copy {
+    transform: translateY(0);
+  }
+}
+
 /* ─── App shell / responsive navigation ───────────────────────── */
 .app-shell {
   min-height: 100dvh;
@@ -367,7 +472,7 @@ body {
     z-index: 0;
   }
 
-  .topbar-brand span {
+  .topbar-brand .brand-logo-text {
     font-size: 17px !important;
     font-weight: 680 !important;
     color: rgba(255,255,255,0.92) !important;

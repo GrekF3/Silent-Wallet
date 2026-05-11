@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useWalletStore, type View } from "@/lib/store";
 import { Icons } from "@/components/ui/Icon";
+import { BrandLogo } from "@/components/ui/BrandLogo";
 import { shortenAddress } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 
@@ -64,8 +65,9 @@ export function Header() {
         onClick={() => setView("dashboard")}
         className="topbar-brand"
         style={{ display: "flex", alignItems: "center", cursor: "pointer", background: "none", border: "none", flexShrink: 0, padding: 0 }}
+        aria-label="Open Silent overview"
       >
-        <span style={{ fontSize: 16, fontWeight: 650, color: "rgba(255,255,255,0.88)", letterSpacing: 0 }}>Silent</span>
+        <BrandLogo size={30} label="Silent" />
         {sessionMode === "watch" && (
           <span className="topbar-watch-badge" style={{ marginLeft: 9, padding: "2px 7px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.42)", fontSize: 10, fontWeight: 650 }}>
             Watch

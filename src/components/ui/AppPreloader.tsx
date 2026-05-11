@@ -1,10 +1,11 @@
 "use client";
 import { motion } from "framer-motion";
+import { BrandLogo } from "@/components/ui/BrandLogo";
 
 export function AppPreloader({ label = "Syncing wallet" }: { label?: string }) {
   return (
     <motion.div
-      initial={{ opacity: 0 }}
+      initial={false}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.28 }}
@@ -21,19 +22,14 @@ export function AppPreloader({ label = "Syncing wallet" }: { label?: string }) {
       }}
     >
       <motion.div
-        initial={{ opacity: 0, y: 8 }}
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, ease: "easeOut" }}
         style={{
           position: "relative",
-          fontSize: 36,
-          fontWeight: 650,
-          color: "#fff",
-          letterSpacing: 0,
-          lineHeight: 1,
         }}
       >
-        Silent
+        <BrandLogo size={62} label="Silent" orientation="column" reveal="always" />
         <motion.span
           aria-hidden
           animate={{ x: ["-18%", "118%"], opacity: [0, 1, 0] }}
