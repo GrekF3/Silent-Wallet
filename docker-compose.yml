@@ -10,5 +10,11 @@ services:
     environment:
       - NODE_ENV=production
     restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.silent-wallet.rule=Host(`app.swallet.site`)
+      - traefik.http.routers.silent-wallet.entrypoints=websecure
+      - traefik.http.routers.silent-wallet.tls.certresolver=letsencrypt
+      - traefik.http.services.silent-wallet.loadbalancer.server.port=3000
 
   # Dev override — run separately: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
