@@ -6,9 +6,10 @@ import { GlassCard }      from "@/components/ui/GlassCard";
 import { GlassButton }    from "@/components/ui/GlassButton";
 import { Icons }          from "@/components/ui/Icon";
 import { Sparkline }      from "@/components/ui/Sparkline";
+import { InteractiveChart, type ChartPoint } from "@/components/ui/InteractiveChart";
 import { CryptoIcon }     from "@/components/ui/CryptoIcon";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
-import { useWalletStore, type AssetInfo } from "@/lib/store";
+import { useWalletStore, type AssetInfo, type AssetRef } from "@/lib/store";
 import { formatUSD, formatCrypto, shortenAddress, formatDate } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 
@@ -49,8 +50,10 @@ type DisplayAsset = {
   change24h: number;
   change7d: number;
   spark7d: number[];
+  spark7dTimestamps: number[];
   image: string;
   kind: "native" | "evm" | "spl";
+  assetRef: AssetRef;
   nativeRef?: AssetInfo;
 };
 
@@ -65,6 +68,24 @@ function Bone({ w, h, r = 8 }: { w: number | string; h: number; r?: number }) {
 
 function assetValue(asset: DisplayAsset) {
   return asset.balance * asset.priceUSD;
+}
+
+function CleanAssetIcon({ symbol, image, size = 31 }: { symbol: string; image: string; size?: number }) {
+  return (
+    <div
+      style={{
+        width: 42,
+        height: 42,
+        flexShrink: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        filter: "drop-shadow(0 8px 16px rgba(0,0,0,0.48)) drop-shadow(0 0 10px rgba(255,255,255,0.08))",
+      }}
+    >
+      <CryptoIcon symbol={symbol} image={image} size={size} />
+    </div>
+  );
 }
 
 function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
@@ -99,9 +120,7 @@ function AssetRow({ asset, privacyMode, onClick }: { asset: DisplayAsset; privac
   return (
     <GlassCard hover onClick={onClick} style={{ padding: "12px 16px", cursor: "pointer" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
-        <div style={{ width: 42, height: 42, borderRadius: 13, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: NET_BG[asset.network], border: "1px solid rgba(255,255,255,0.09)", borderTop: "1px solid rgba(255,255,255,0.20)", boxShadow: "0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08)" }}>
-          <CryptoIcon symbol={asset.symbol} image={asset.image} size={23} />
-        </div>
+        <CleanAssetIcon symbol={asset.symbol} image={asset.image} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 3, minWidth: 0 }}>
             <span style={{ fontSize: 14, fontWeight: 650, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{asset.symbol}</span>
@@ -109,7 +128,7 @@ function AssetRow({ asset, privacyMode, onClick }: { asset: DisplayAsset; privac
           </div>
           <span style={{ fontSize: 11, color: "rgba(255,255,255,0.28)" }}>{formatCrypto(asset.balance, 5)} {asset.symbol}</span>
         </div>
-        {asset.spark7d.length > 1 && <Sparkline data={asset.spark7d} width={56} height={26} positive={asset.change7d >= 0} />}
+        <Sparkline data={asset.spark7d} width={56} height={26} positive={asset.change7d >= 0} />
         <div style={{ textAlign: "right", minWidth: 86, flexShrink: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 550, color: "#fff", fontVariantNumeric: "tabular-nums", marginBottom: 3 }}>
             {privacyMode ? "••••" : needsPrice ? "Pricing..." : formatUSD(asset.valueUSD)}
@@ -303,7 +322,7 @@ const up: Variants = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, 
 
 export function Dashboard() {
   const {
-    assets, evmTokens, splTokens, addresses, loading, initialLoaded, loadingState, lastUpdated, setView, openAsset,
+    assets, evmTokens, splTokens, addresses, loading, initialLoaded, loadingState, lastUpdated, setView, openTransfer, setEcosystemTab, openAsset,
     sessionMode, watchName,
     privacyMode, setPrivacyMode, hideZeroBalances, setHideZeroBalances, hiddenAssetIds,
   } = useWalletStore();
@@ -312,6 +331,7 @@ export function Dashboard() {
   const [networks, setNetworks] = useState<WalletNetwork[]>(NETWORKS);
   const [sortMode, setSortMode] = useState<SortMode>("value");
   const [manageOpen, setManageOpen] = useState(false);
+  const [chartOpen, setChartOpen] = useState(false);
 
   const allAssets = useMemo<DisplayAsset[]>(() => [
     ...assets.map((asset) => ({
@@ -325,8 +345,10 @@ export function Dashboard() {
       change24h: asset.change24h,
       change7d: asset.change7d,
       spark7d: asset.spark7d,
+      spark7dTimestamps: asset.spark7dTimestamps,
       image: asset.image,
       kind: "native" as const,
+      assetRef: { kind: "native" as const, id: asset.id, network: asset.network },
       nativeRef: asset,
     })),
     ...evmTokens.map((token) => ({
@@ -340,8 +362,10 @@ export function Dashboard() {
       change24h: token.change24h,
       change7d: 0,
       spark7d: [],
+      spark7dTimestamps: [],
       image: token.image,
       kind: "evm" as const,
+      assetRef: { kind: "evm" as const, id: token.contract.toLowerCase(), network: token.chain === "bsc" ? "bsc" as const : "ethereum" as const },
     })),
     ...splTokens.map((token) => ({
       id: `spl:${token.mint}`,
@@ -354,12 +378,31 @@ export function Dashboard() {
       change24h: token.change24h ?? 0,
       change7d: 0,
       spark7d: [],
+      spark7dTimestamps: [],
       image: token.logoURI ?? "",
       kind: "spl" as const,
+      assetRef: { kind: "spl" as const, id: token.mint, network: "solana" as const },
     })),
   ], [assets, evmTokens, splTokens]);
 
   const activeAssets = useMemo(() => allAssets.filter((asset) => !hiddenAssetIds.includes(asset.id)), [allAssets, hiddenAssetIds]);
+  const portfolioPoints = useMemo<ChartPoint[]>(() => {
+    const sources = activeAssets.filter((asset) => asset.balance > 0 && asset.spark7d.length > 1);
+    if (sources.length === 0) return [];
+
+    const length = Math.min(...sources.map((asset) => asset.spark7d.length));
+    if (length < 2) return [];
+
+    const timestampSource = sources.find((asset) => asset.spark7dTimestamps.length >= length);
+
+    return Array.from({ length }, (_, index) => ({
+      value: sources.reduce((sum, asset) => {
+        const offset = asset.spark7d.length - length;
+        return sum + asset.spark7d[offset + index] * asset.balance;
+      }, 0),
+      timestamp: timestampSource?.spark7dTimestamps[timestampSource.spark7dTimestamps.length - length + index],
+    }));
+  }, [activeAssets]);
   const total = activeAssets.reduce((sum, asset) => sum + asset.valueUSD, 0);
   const totalChange = activeAssets.reduce((sum, asset) => sum + asset.valueUSD * (asset.change24h / 100), 0);
   const pct = total > 0 ? (totalChange / (total - totalChange || total)) * 100 : 0;
@@ -417,12 +460,28 @@ export function Dashboard() {
             <div style={{ marginTop: 5, fontSize: 11, color: "rgba(255,255,255,0.28)" }}>Approximately</div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
               {!showSkeleton && !privacyMode && (
-                <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: 18, background: pos ? "rgba(255,255,255,0.05)" : "rgba(255,60,60,0.07)", border: `1px solid ${pos ? "rgba(255,255,255,0.08)" : "rgba(255,80,80,0.15)"}` }}>
+                <button
+                  type="button"
+                  onClick={() => setChartOpen((open) => !open)}
+                  aria-expanded={chartOpen}
+                  title={chartOpen ? "Hide portfolio chart" : "Show portfolio chart"}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                    padding: "3px 9px",
+                    borderRadius: 18,
+                    background: pos ? "rgba(255,255,255,0.05)" : "rgba(255,60,60,0.07)",
+                    border: `1px solid ${pos ? "rgba(255,255,255,0.08)" : "rgba(255,80,80,0.15)"}`,
+                    cursor: "pointer",
+                    font: "inherit",
+                  }}
+                >
                   {pos ? <Icons.trendUp size={11} color="rgba(255,255,255,0.60)" /> : <Icons.trendDown size={11} color="rgba(255,100,100,0.80)" />}
                   <span style={{ fontSize: 11, fontWeight: 500, color: pos ? "rgba(255,255,255,0.65)" : "rgba(255,100,100,0.80)", fontVariantNumeric: "tabular-nums" }}>
                     {pos ? "+" : ""}{formatUSD(totalChange)} · {pos ? "+" : ""}{pct.toFixed(2)}% 24h
                   </span>
-                </div>
+                </button>
               )}
               {addr && (
                 <button onClick={() => { navigator.clipboard.writeText(addr); toast("Address copied"); }}
@@ -447,6 +506,74 @@ export function Dashboard() {
               <GlassButton variant="default" size="md" onClick={() => setView("transfer")}><Icons.receive size={13} /> Receive</GlassButton>
             </div>
           )}
+        </div>
+      </motion.div>
+
+      <AnimatePresence initial={false}>
+        {chartOpen && !showSkeleton && !privacyMode && (
+          <motion.div
+            key="portfolio-chart"
+            initial={{ opacity: 0, y: -18, scaleX: 0.82, scaleY: 0.08, height: 0, filter: "blur(10px)" }}
+            animate={{ opacity: 1, y: 0, scaleX: 1, scaleY: 1, height: "auto", filter: "blur(0px)" }}
+            exit={{ opacity: 0, y: -16, scaleX: 0.82, scaleY: 0.08, height: 0, filter: "blur(8px)" }}
+            transition={{ type: "spring", stiffness: 360, damping: 34, mass: 0.8 }}
+            style={{ transformOrigin: "top center", overflow: "hidden" }}
+          >
+            <GlassCard elevated style={{ padding: "14px 16px 12px", overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 650, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.34)" }}>Overview</div>
+                  <div style={{ marginTop: 4, fontSize: 12, color: "rgba(255,255,255,0.24)" }}>Portfolio value, 7D</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setChartOpen(false)}
+                  title="Collapse chart"
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 11,
+                    border: "1px solid rgba(255,255,255,0.10)",
+                    background: "rgba(255,255,255,0.05)",
+                    color: "rgba(255,255,255,0.48)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                  }}
+                >
+                  <span style={{ transform: "rotate(180deg)", display: "flex" }}>
+                    <Icons.chevronD size={15} />
+                  </span>
+                </button>
+              </div>
+              <InteractiveChart points={portfolioPoints} positive={pos} />
+            </GlassCard>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <motion.div variants={up}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8 }}>
+          {[
+            { label: "Buy", icon: Icons.receive, tab: "ramp" as const },
+            { label: "Sell", icon: Icons.send, tab: "ramp" as const },
+            { label: "Swap", icon: Icons.swap, tab: "swap" as const },
+            { label: "Bridge", icon: Icons.globe, tab: "bridge" as const },
+          ].map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => setEcosystemTab(item.tab)}
+                style={{ minHeight: 58, borderRadius: 16, border: "1px solid rgba(255,255,255,0.10)", borderTop: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.055)", color: "rgba(255,255,255,0.72)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", font: "inherit", fontSize: 12, fontWeight: 650, boxShadow: "0 2px 10px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.08)" }}
+              >
+                <Icon size={15} />
+                {item.label}
+              </button>
+            );
+          })}
         </div>
       </motion.div>
 
@@ -507,7 +634,7 @@ export function Dashboard() {
                   <AssetRow
                     asset={asset}
                     privacyMode={privacyMode}
-                    onClick={() => asset.nativeRef ? openAsset(asset.nativeRef) : setView("transfer")}
+                    onClick={() => asset.nativeRef ? openAsset(asset.nativeRef) : openTransfer("send", asset.assetRef)}
                   />
                 </motion.div>
               ))}

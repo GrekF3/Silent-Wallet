@@ -6,6 +6,7 @@ export type CoinData = {
   usd_7d_change:  number;
   image:          string;
   spark7d:        number[];
+  spark7dTimestamps: number[];
 };
 
 export type Prices = Record<string, CoinData>;

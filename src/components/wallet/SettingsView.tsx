@@ -5,21 +5,12 @@ import { GlassCard }   from "@/components/ui/GlassCard";
 import { GlassButton } from "@/components/ui/GlassButton";
 import { Icons }       from "@/components/ui/Icon";
 import { useWalletStore } from "@/lib/store";
-import { shortenAddress } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 import { deleteWallet } from "@/lib/storage";
 
 const T = {
   label: { fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "rgba(255,255,255,0.28)", marginBottom: 10, display: "block" } as React.CSSProperties,
 };
-
-const EMPTY_EVM = "0x0000000000000000000000000000000000000000";
-
-function primaryAddress(addresses: ReturnType<typeof useWalletStore.getState>["addresses"]) {
-  if (!addresses) return "";
-  if (addresses.ethereum && addresses.ethereum !== EMPTY_EVM) return addresses.ethereum;
-  return addresses.bitcoin || addresses.solana || "";
-}
 
 function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
   return (
@@ -144,14 +135,11 @@ function ResetModal({ onConfirm, onClose }: { onConfirm: () => void; onClose: ()
 }
 
 export function SettingsView() {
-  const { addresses, mnemonic, clearSession, network, setNetwork, sessionMode, watchName } = useWalletStore();
-  const addr  = primaryAddress(addresses);
+  const { mnemonic, clearSession, network, setNetwork, sessionMode, hideZeroBalances, setHideZeroBalances } = useWalletStore();
   const watchOnly = sessionMode === "watch";
-  const toast = useToast();
 
   const [showPhrase, setShowPhrase] = useState(false);
   const [showReset,  setShowReset]  = useState(false);
-  const [hideSmall,  setHideSmall]  = useState(false);
 
   const handleReset = async () => {
     await deleteWallet();
@@ -178,29 +166,6 @@ export function SettingsView() {
           <span style={T.label}>Account</span>
           <div style={{ fontSize: 28, fontWeight: 300, letterSpacing: "-0.015em", color: "#fff" }}>Settings</div>
         </div>
-
-        {/* Profile card */}
-        <GlassCard elevated style={{ padding: "18px 20px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <div style={{ width: 48, height: 48, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)", borderTop: "1px solid rgba(255,255,255,0.22)", fontSize: 18, fontWeight: 700, color: "#fff", boxShadow: "0 2px 10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.10)" }}>
-              S
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: "#fff", marginBottom: 3 }}>{watchOnly ? (watchName ?? "Observer") : "Silent Wallet"}</div>
-              <div style={{ fontSize: 12, fontFamily: "monospace", color: "rgba(255,255,255,0.35)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {shortenAddress(addr, 8)}
-              </div>
-            </div>
-            <button
-              onClick={() => { navigator.clipboard.writeText(addr); toast("Address copied"); }}
-              style={{ width: 34, height: 34, borderRadius: 10, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)", borderTop: "1px solid rgba(255,255,255,0.18)", color: "rgba(255,255,255,0.40)", transition: "color 0.15s" }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = "#fff")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.40)")}
-            >
-              <Icons.copy size={13} />
-            </button>
-          </div>
-        </GlassCard>
 
         {/* Network */}
         <div>
@@ -230,8 +195,8 @@ export function SettingsView() {
               <div style={{ width: 32, height: 32, borderRadius: 10, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", borderTop: "1px solid rgba(255,255,255,0.16)" }}>
                 <Icons.eye size={14} color="rgba(255,255,255,0.40)" />
               </div>
-              <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: "rgba(255,255,255,0.85)" }}>Hide small balances</span>
-              <Toggle on={hideSmall} onChange={() => setHideSmall(!hideSmall)} />
+              <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: "rgba(255,255,255,0.85)" }}>Hide zero balances</span>
+              <Toggle on={hideZeroBalances} onChange={() => setHideZeroBalances(!hideZeroBalances)} />
             </div>
           </GlassCard>
         </div>
@@ -290,7 +255,7 @@ export function SettingsView() {
         </motion.button>
 
         <div style={{ fontSize: 11, color: "rgba(255,255,255,0.14)", textAlign: "center", letterSpacing: "0.04em", paddingBottom: 16 }}>
-          Silent Wallet · v0.1.0 · ETH · BTC · BNB · SOL
+          Silent Wallet
         </div>
       </motion.div>
     </>

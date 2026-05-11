@@ -4,6 +4,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { Setup }    from "@/components/onboarding/Setup";
 import { Lock }     from "@/components/onboarding/Lock";
 import { AppPreloader } from "@/components/ui/AppPreloader";
+import { AppUpdateNotice } from "@/components/ui/AppUpdateNotice";
 import { hasWallet } from "@/lib/storage";
 import { readSession } from "@/lib/session";
 import { useWalletStore } from "@/lib/store";
@@ -43,7 +44,12 @@ export default function Home() {
     return <AppPreloader label="Opening wallet" />;
   }
 
-  if (screen === "setup") return <Setup onDone={() => setScreen("app")} />;
-  if (screen === "lock")  return <Lock onUnlock={() => setScreen("app")} />;
-  return <AppShell onLock={goLock} />;
+  return (
+    <>
+      {screen === "setup" && <Setup onDone={() => setScreen("app")} />}
+      {screen === "lock" && <Lock onUnlock={() => setScreen("app")} />}
+      {screen === "app" && <AppShell onLock={goLock} />}
+      <AppUpdateNotice />
+    </>
+  );
 }

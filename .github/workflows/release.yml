@@ -98,6 +98,7 @@ jobs:
     needs: [prepare-release, desktop, android]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: silent-wallet-android-debug
@@ -154,6 +155,18 @@ jobs:
 
           published_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           version="${tag#v}"
+          notes=""
+          if [ -f CHANGELOG.md ]; then
+            notes="$(awk -v version="$version" '
+              $0 ~ "^##[[:space:]]+v?" version "([[:space:]]|$)" { capture=1; next }
+              capture && $0 ~ "^##[[:space:]]+" { exit }
+              capture { print }
+            ' CHANGELOG.md | sed '/^[[:space:]]*$/d')"
+          fi
+          if [ -z "$notes" ]; then
+            notes="$(gh release view "$tag" --repo "$GH_REPO" --json body --jq .body)"
+          fi
+          notes_json="$(printf '%s' "$notes" | jq -Rs .)"
           mac_url="$(asset_url "${mac_app[0]}")"
           mac_sig="$(sig_json "${mac_app_sig[0]}")"
           win_msi_url="$(asset_url "${win_msi[0]}")"
@@ -164,7 +177,7 @@ jobs:
           cat > latest.json <<JSON
           {
             "version": "$version",
-            "notes": "",
+            "notes": $notes_json,
             "pub_date": "$published_at",
             "platforms": {
               "darwin-aarch64": { "signature": $mac_sig, "url": "$mac_url" },

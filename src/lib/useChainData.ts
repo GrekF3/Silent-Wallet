@@ -35,11 +35,11 @@ async function loadWithTimeout<T>(promise: Promise<T>, ms: number): Promise<Load
 
 function emptyPrices(): Prices {
   return {
-    ETH:  { usd: 0, usd_24h_change: 0, usd_7d_change: 0, image: "", spark7d: [] },
-    BTC:  { usd: 0, usd_24h_change: 0, usd_7d_change: 0, image: "", spark7d: [] },
-    BNB:  { usd: 0, usd_24h_change: 0, usd_7d_change: 0, image: "", spark7d: [] },
-    SOL:  { usd: 0, usd_24h_change: 0, usd_7d_change: 0, image: "", spark7d: [] },
-    USDC: { usd: 1, usd_24h_change: 0, usd_7d_change: 0, image: "", spark7d: [] },
+    ETH:  { usd: 0, usd_24h_change: 0, usd_7d_change: 0, image: "", spark7d: [], spark7dTimestamps: [] },
+    BTC:  { usd: 0, usd_24h_change: 0, usd_7d_change: 0, image: "", spark7d: [], spark7dTimestamps: [] },
+    BNB:  { usd: 0, usd_24h_change: 0, usd_7d_change: 0, image: "", spark7d: [], spark7dTimestamps: [] },
+    SOL:  { usd: 0, usd_24h_change: 0, usd_7d_change: 0, image: "", spark7d: [], spark7dTimestamps: [] },
+    USDC: { usd: 1, usd_24h_change: 0, usd_7d_change: 0, image: "", spark7d: [], spark7dTimestamps: [] },
   };
 }
 
@@ -58,6 +58,7 @@ function mergePrices(fresh: Prices | null, previous: Prices | null): Prices {
       usd: usableCoin.usd || prevCoin?.usd || base.usd,
       image: usableCoin.image || prevCoin?.image || base.image,
       spark7d: usableCoin.spark7d?.length ? usableCoin.spark7d : (prevCoin?.spark7d ?? base.spark7d),
+      spark7dTimestamps: usableCoin.spark7dTimestamps?.length ? usableCoin.spark7dTimestamps : (prevCoin?.spark7dTimestamps ?? base.spark7dTimestamps),
     };
   }
 
@@ -132,10 +133,10 @@ export function useChainData() {
         fresh.ok ? fresh.value : (prevAssets.find((a) => a.id === id)?.balance ?? 0);
 
       const allNativeAssets: AssetInfo[] = [
-        { id: "eth", symbol: "ETH", name: "Ethereum", network: "ethereum", balance: safeBal(ethBal, "eth"), priceUSD: prices.ETH?.usd ?? 0, change24h: prices.ETH?.usd_24h_change ?? 0, change7d: prices.ETH?.usd_7d_change ?? 0, spark7d: prices.ETH?.spark7d ?? [], image: prices.ETH?.image ?? "", desc: "Smart contract platform" },
-        { id: "btc", symbol: "BTC", name: "Bitcoin",  network: "bitcoin",  balance: safeBal(btcBal, "btc"), priceUSD: prices.BTC?.usd ?? 0, change24h: prices.BTC?.usd_24h_change ?? 0, change7d: prices.BTC?.usd_7d_change ?? 0, spark7d: prices.BTC?.spark7d ?? [], image: prices.BTC?.image ?? "", desc: "Original decentralised currency" },
-        { id: "bnb", symbol: "BNB", name: "BNB",      network: "bsc",      balance: safeBal(bnbBal, "bnb"), priceUSD: prices.BNB?.usd ?? 0, change24h: prices.BNB?.usd_24h_change ?? 0, change7d: prices.BNB?.usd_7d_change ?? 0, spark7d: prices.BNB?.spark7d ?? [], image: prices.BNB?.image ?? "", desc: "BNB Chain native token" },
-        { id: "sol", symbol: "SOL", name: "Solana",   network: "solana",   balance: safeBal(solBal, "sol"), priceUSD: prices.SOL?.usd ?? 0, change24h: prices.SOL?.usd_24h_change ?? 0, change7d: prices.SOL?.usd_7d_change ?? 0, spark7d: prices.SOL?.spark7d ?? [], image: prices.SOL?.image ?? "", desc: "High-performance L1" },
+        { id: "eth", symbol: "ETH", name: "Ethereum", network: "ethereum", balance: safeBal(ethBal, "eth"), priceUSD: prices.ETH?.usd ?? 0, change24h: prices.ETH?.usd_24h_change ?? 0, change7d: prices.ETH?.usd_7d_change ?? 0, spark7d: prices.ETH?.spark7d ?? [], spark7dTimestamps: prices.ETH?.spark7dTimestamps ?? [], image: prices.ETH?.image ?? "", desc: "Smart contract platform" },
+        { id: "btc", symbol: "BTC", name: "Bitcoin",  network: "bitcoin",  balance: safeBal(btcBal, "btc"), priceUSD: prices.BTC?.usd ?? 0, change24h: prices.BTC?.usd_24h_change ?? 0, change7d: prices.BTC?.usd_7d_change ?? 0, spark7d: prices.BTC?.spark7d ?? [], spark7dTimestamps: prices.BTC?.spark7dTimestamps ?? [], image: prices.BTC?.image ?? "", desc: "Original decentralised currency" },
+        { id: "bnb", symbol: "BNB", name: "BNB",      network: "bsc",      balance: safeBal(bnbBal, "bnb"), priceUSD: prices.BNB?.usd ?? 0, change24h: prices.BNB?.usd_24h_change ?? 0, change7d: prices.BNB?.usd_7d_change ?? 0, spark7d: prices.BNB?.spark7d ?? [], spark7dTimestamps: prices.BNB?.spark7dTimestamps ?? [], image: prices.BNB?.image ?? "", desc: "BNB Chain native token" },
+        { id: "sol", symbol: "SOL", name: "Solana",   network: "solana",   balance: safeBal(solBal, "sol"), priceUSD: prices.SOL?.usd ?? 0, change24h: prices.SOL?.usd_24h_change ?? 0, change7d: prices.SOL?.usd_7d_change ?? 0, spark7d: prices.SOL?.spark7d ?? [], spark7dTimestamps: prices.SOL?.spark7dTimestamps ?? [], image: prices.SOL?.image ?? "", desc: "High-performance L1" },
       ];
       const assets = sessionMode === "watch"
         ? allNativeAssets.filter((asset) =>

@@ -19,20 +19,29 @@ const FALLBACK_IMAGES: Record<string, string> = {
 };
 
 function emptyCoin(symbol: string): CoinData {
-  return { usd: 0, usd_24h_change: 0, usd_7d_change: 0, image: FALLBACK_IMAGES[symbol] ?? "", spark7d: [] };
+  return { usd: 0, usd_24h_change: 0, usd_7d_change: 0, image: FALLBACK_IMAGES[symbol] ?? "", spark7d: [], spark7dTimestamps: [] };
 }
 
-async function fetchSpark(id: string): Promise<number[]> {
+type SparkData = {
+  prices: number[];
+  timestamps: number[];
+};
+
+async function fetchSpark(id: string): Promise<SparkData> {
   try {
     const r = await fetch(
-      `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=7&interval=daily`,
+      `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=7`,
       { signal: AbortSignal.timeout(10_000), headers: serverCoinGeckoHeaders(), cache: "no-store" }
     );
-    if (!r.ok) return [];
-    const d = await r.json();
-    return (d.prices as [number, number][])?.map(([, p]) => p) ?? [];
+    if (!r.ok) return { prices: [], timestamps: [] };
+    const d = await r.json() as { prices?: [number, number][] };
+    const prices = d.prices?.filter(([, price]) => Number.isFinite(price) && price > 0) ?? [];
+    return {
+      prices: prices.map(([, price]) => price),
+      timestamps: prices.map(([timestamp]) => timestamp),
+    };
   } catch {
-    return [];
+    return { prices: [], timestamps: [] };
   }
 }
 
@@ -56,7 +65,8 @@ async function coinGeckoPrices(): Promise<Prices> {
       usd_24h_change: (row?.price_change_percentage_24h as number)            ?? 0,
       usd_7d_change:  (row?.price_change_percentage_7d_in_currency as number) ?? 0,
       image:          (row?.image as string)                                   ?? FALLBACK_IMAGES[sym] ?? "",
-      spark7d:        sparks[i],
+      spark7d:        sparks[i].prices,
+      spark7dTimestamps: sparks[i].timestamps,
     };
   });
   return result;

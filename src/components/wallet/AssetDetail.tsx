@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { GlassCard }   from "@/components/ui/GlassCard";
 import { GlassButton } from "@/components/ui/GlassButton";
@@ -7,6 +7,7 @@ import { Icons }       from "@/components/ui/Icon";
 import { useWalletStore } from "@/lib/store";
 import { formatUSD, formatCrypto, formatDate } from "@/lib/utils";
 import { CryptoIcon } from "@/components/ui/CryptoIcon";
+import { InteractiveChart, type ChartPoint } from "@/components/ui/InteractiveChart";
 
 const NET_COLOR: Record<string, string> = {
   ethereum: "rgba(98,88,255,0.12)", bitcoin: "rgba(247,147,26,0.12)",
@@ -14,51 +15,16 @@ const NET_COLOR: Record<string, string> = {
 };
 const NET_LABEL: Record<string, string> = { ethereum: "ETH", bitcoin: "BTC", bsc: "BSC", solana: "SOL" };
 
-const PERIODS = ["1D","1W","1M","1Y"] as const;
-type Period = typeof PERIODS[number];
-
-function BigChart({ data, width = 580, height = 140, positive }: { data: number[]; width?: number; height?: number; positive?: boolean }) {
-  if (data.length < 2) return null;
-  const min = Math.min(...data), max = Math.max(...data), range = max - min || 1;
-  const pad = 12;
-  const w = width - pad * 2, h = height - pad * 2;
-  const pts = data.map((v, i) => {
-    const x = pad + (i / (data.length - 1)) * w;
-    const y = pad + h - ((v - min) / range) * h;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-  const d    = `M ${pts.join(" L ")}`;
-  const fill = `M ${pad},${pad+h} L ${pts.join(" L ")} L ${pad+w},${pad+h} Z`;
-  const color = positive === false ? "rgba(255,100,100,0.8)" : "rgba(255,255,255,0.70)";
-
-  return (
-    <svg width="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ overflow: "visible" }}>
-      <defs>
-        <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={positive === false ? "rgba(255,100,100,0.14)" : "rgba(255,255,255,0.10)"} />
-          <stop offset="100%" stopColor="rgba(0,0,0,0)" />
-        </linearGradient>
-      </defs>
-      <path d={fill} fill="url(#chartFill)" />
-      <motion.path
-        d={d} fill="none" stroke={color} strokeWidth="1.8"
-        strokeLinecap="round" strokeLinejoin="round"
-        initial={{ pathLength: 0, opacity: 0 }}
-        animate={{ pathLength: 1, opacity: 1 }}
-        transition={{ duration: 0.9, ease: "easeOut" }}
-      />
-      {/* Last point dot */}
-      {(() => {
-        const last = pts[pts.length - 1].split(",");
-        return <circle cx={last[0]} cy={last[1]} r="3.5" fill={color} />;
-      })()}
-    </svg>
-  );
-}
-
 export function AssetDetail() {
-  const { selectedAsset, closeAsset, setView, transactions, sessionMode } = useWalletStore();
-  const [period, setPeriod] = useState<Period>("1W");
+  const { selectedAsset, closeAsset, openTransfer, transactions, sessionMode } = useWalletStore();
+  const chartPoints = useMemo<ChartPoint[]>(() => selectedAsset
+    ? selectedAsset.spark7d.map((value, index) => ({
+      value,
+      timestamp: selectedAsset.spark7dTimestamps[index],
+    }))
+    : [],
+  [selectedAsset]);
+
   if (!selectedAsset) return null;
 
   const a   = selectedAsset;
@@ -95,15 +61,12 @@ export function AssetDetail() {
 
         <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
           <div style={{
-            width: 40, height: 40, borderRadius: 13, flexShrink: 0,
+            width: 42, height: 42, flexShrink: 0,
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 17, fontWeight: 700, color: "#fff",
-            background: NET_COLOR[a.network],
-            border: "1px solid rgba(255,255,255,0.09)",
-            borderTop: "1px solid rgba(255,255,255,0.20)",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.09)",
+            filter: "drop-shadow(0 9px 18px rgba(0,0,0,0.52)) drop-shadow(0 0 11px rgba(255,255,255,0.08))",
           }}>
-            <CryptoIcon symbol={a.symbol} image={a.image} size={22} />
+            <CryptoIcon symbol={a.symbol} image={a.image} size={33} />
           </div>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -119,10 +82,6 @@ export function AssetDetail() {
             <span style={{ fontSize: 12, color: "rgba(255,255,255,0.30)" }}>{a.desc}</span>
           </div>
         </div>
-
-        <GlassButton variant="ghost" size="sm" style={{ padding: "0 10px" }}>
-          <Icons.externalLink size={14} />
-        </GlassButton>
       </div>
 
       {/* ── Price + chart ──────────────────────────────────────── */}
@@ -144,26 +103,14 @@ export function AssetDetail() {
             </div>
           </div>
 
-          {/* Period selector */}
-          <div style={{ display: "flex", gap: 2, padding: 3, borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
-            {PERIODS.map((p) => (
-              <button key={p} onClick={() => setPeriod(p)} style={{
-                padding: "4px 10px", borderRadius: 7, cursor: "pointer",
-                fontSize: 12, fontWeight: 500, fontFamily: "inherit",
-                border: "none",
-                background: period === p ? "rgba(255,255,255,0.10)" : "transparent",
-                color: period === p ? "#fff" : "rgba(255,255,255,0.32)",
-                transition: "all 0.15s",
-              }}>
-                {p}
-              </button>
-            ))}
+          <div style={{ flexShrink: 0, padding: "5px 10px", borderRadius: 10, background: "rgba(255,255,255,0.045)", border: "1px solid rgba(255,255,255,0.07)", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.44)" }}>
+            7D
           </div>
         </div>
 
         {/* Chart */}
         <div style={{ width: "100%", height: 140 }}>
-          <BigChart data={a.spark7d} positive={a.change7d >= 0} />
+          <InteractiveChart points={chartPoints} height={140} positive={a.change7d >= 0} />
         </div>
       </GlassCard>
 
@@ -185,10 +132,10 @@ export function AssetDetail() {
       {/* ── Actions ────────────────────────────────────────────── */}
       {!watchOnly && (
         <div style={{ display: "flex", gap: 10 }}>
-          <GlassButton variant="primary" size="lg" style={{ flex: 1 }} onClick={() => setView("transfer")}>
+          <GlassButton variant="primary" size="lg" style={{ flex: 1 }} onClick={() => openTransfer("send", { kind: "native", id: a.id, network: a.network })}>
             <Icons.send size={15} color="#000" /> Send
           </GlassButton>
-          <GlassButton variant="default" size="lg" style={{ flex: 1 }} onClick={() => setView("transfer")}>
+          <GlassButton variant="default" size="lg" style={{ flex: 1 }} onClick={() => openTransfer("receive", { kind: "native", id: a.id, network: a.network })}>
             <Icons.receive size={15} /> Receive
           </GlassButton>
         </div>

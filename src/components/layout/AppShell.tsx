@@ -10,6 +10,7 @@ import { AssetDetail }  from "@/components/wallet/AssetDetail";
 import { TransferView } from "@/components/wallet/TransferView";
 import { HistoryView }  from "@/components/wallet/HistoryView";
 import { SettingsView } from "@/components/wallet/SettingsView";
+import { EcosystemView } from "@/components/wallet/ecosystem/EcosystemView";
 import { AppPreloader } from "@/components/ui/AppPreloader";
 import { useChainData } from "@/lib/useChainData";
 
@@ -31,6 +32,7 @@ export function AppShell({ onLock }: { onLock: () => void }) {
       case "transfer":  return sessionMode === "watch" ? <Dashboard /> : <TransferView />;
       case "history":   return <HistoryView />;
       case "settings":  return <SettingsView />;
+      case "ecosystem": return <EcosystemView />;
     }
   };
 

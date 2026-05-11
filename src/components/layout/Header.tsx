@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/Toast";
 type NavItem = { id: View; label: string };
 const NAV: NavItem[] = [
   { id: "dashboard", label: "Overview"  },
+  { id: "ecosystem", label: "Web3" },
   { id: "transfer",  label: "Transfer"  },
   { id: "history",   label: "History"   },
   { id: "settings",  label: "Settings"  },
@@ -38,6 +39,11 @@ export function Header() {
         return value && value !== EMPTY_EVM;
       })
     : [];
+  const primaryEntry = entries.find(([key]) => key === "ethereum") ?? entries[0];
+  const primaryAddress = primaryEntry?.[0] === "bsc" ? addresses?.bsc
+    : primaryEntry?.[0] === "bitcoin" ? addresses?.bitcoin
+    : primaryEntry?.[0] === "solana" ? addresses?.solana
+    : addresses?.ethereum;
 
   const copyAddress = async (address: string, label: string) => {
     await navigator.clipboard.writeText(address);
@@ -75,7 +81,7 @@ export function Header() {
         )}
       </button>
 
-      <nav className="desktop-nav" style={{ display: "flex", alignItems: "center", gap: 2, flex: 1 }}>
+      <nav className="desktop-nav" style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>
         {navItems.map((item) => {
           const active = activeNav === item.id;
           return (
@@ -121,16 +127,24 @@ export function Header() {
             aria-label="Wallet addresses"
             aria-expanded={open}
             style={{
-              width: 36, height: 36, borderRadius: 12, cursor: "pointer",
+              minWidth: 36, height: 36, borderRadius: 12, cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center",
+              gap: 7,
+              padding: primaryAddress ? "0 11px" : 0,
               background: open ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.055)",
               border: "1px solid rgba(255,255,255,0.10)",
               borderTop: "1px solid rgba(255,255,255,0.18)",
               color: "rgba(255,255,255,0.58)",
+              fontFamily: "inherit",
               boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)",
             }}
           >
-            <Icons.wallet size={16} />
+            <Icons.wallet size={14} />
+            {primaryAddress && (
+              <span className="topbar-address-text" style={{ fontFamily: "monospace", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.54)", lineHeight: 1 }}>
+                {shortenAddress(primaryAddress, 3)}
+              </span>
+            )}
           </button>
 
           <AnimatePresence>

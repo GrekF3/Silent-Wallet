@@ -18,6 +18,7 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "receive", label: "Received" },
   { id: "send",    label: "Sent"     },
 ];
+const PAGE_SIZE = 20;
 
 function Bone({ w, h, r = 8 }: { w: number | string; h: number; r?: number }) {
   return (
@@ -126,12 +127,15 @@ function TxDetailsModal({ tx, onClose }: { tx: ChainTx; onClose: () => void }) {
 export function HistoryView() {
   const { transactions, historyFilter, setFilter, loading } = useWalletStore();
   const [selectedTx, setSelectedTx] = useState<ChainTx | null>(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const filtered = historyFilter === "all"
     ? transactions
     : transactions.filter((t) => t.type === historyFilter);
+  const visible = filtered.slice(0, visibleCount);
+  const hasMore = visible.length < filtered.length;
 
-  const grouped = filtered.reduce<Record<string, typeof transactions>>((acc, tx) => {
+  const grouped = visible.reduce<Record<string, typeof transactions>>((acc, tx) => {
     const key = formatDateDay(tx.date);
     (acc[key] ??= []).push(tx);
     return acc;
@@ -154,7 +158,9 @@ export function HistoryView() {
           <div style={{ fontSize: 28, fontWeight: 300, letterSpacing: "-0.015em", color: "#fff" }}>History</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.24)" }}>{filtered.length} transactions</span>
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.24)" }}>
+            {filtered.length ? `${visible.length}/${filtered.length}` : "0"} transactions
+          </span>
           <button
             onClick={() => refreshWalletData()}
             disabled={loading}
@@ -184,7 +190,7 @@ export function HistoryView() {
                 />
               )}
               <button
-                onClick={() => setFilter(f.id)}
+                onClick={() => { setFilter(f.id); setVisibleCount(PAGE_SIZE); }}
                 style={{ position: "relative", zIndex: 1, padding: "6px 14px", borderRadius: 10, border: "none", background: "transparent", cursor: "pointer", fontSize: 13, fontWeight: 500, fontFamily: "inherit", color: active ? "#fff" : "rgba(255,255,255,0.32)", transition: "color 0.15s" }}
               >
                 {f.label}
@@ -230,69 +236,71 @@ export function HistoryView() {
         </div>
       ) : (
         /* Transaction groups */
-        Object.entries(grouped).map(([date, txs], gi) => (
-          <motion.div key={date} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: gi * 0.055, duration: 0.26 }}>
-            <span style={T.label}>{date}</span>
-            <GlassCard elevated style={{ overflow: "hidden" }}>
-              {txs.map((tx, idx) => (
-                <div key={tx.hash + idx}>
-                  <motion.button
-                    type="button"
-                    aria-label={`${tx.type === "receive" ? "Received" : "Sent"} ${tx.asset} transaction details`}
-                    onClick={() => setSelectedTx(tx)}
-                    whileHover={{ backgroundColor: "rgba(255,255,255,0.025)" }}
-                    transition={{ duration: 0.12 }}
-                    style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "15px 18px", cursor: "pointer", border: "none", backgroundColor: "rgba(255,255,255,0)", fontFamily: "inherit", textAlign: "left" }}
-                  >
-                    {/* Coin icon */}
-                    <div style={{
-                      width: 40, height: 40, borderRadius: 13, flexShrink: 0,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      background: tx.type === "receive" ? "rgba(120,220,90,0.07)" : "rgba(255,255,255,0.04)",
-                      border: "1px solid rgba(255,255,255,0.09)", borderTop: "1px solid rgba(255,255,255,0.17)",
-                      boxShadow: "0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.07)",
-                    }}>
-                      <CryptoIcon symbol={tx.asset} image={tx.tokenImage} size={20} />
-                    </div>
-
-                    {/* Info */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                        <span style={{ fontSize: 14, fontWeight: 500, color: "#fff", textTransform: "capitalize" }}>
-                          {tx.type === "receive" ? "Received" : "Sent"}
-                        </span>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.45)" }}>{tx.asset}</span>
-                        {tx.status === "pending" && (
-                          <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 6, background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.20)", color: "rgba(251,191,36,0.80)", fontWeight: 500 }}>Pending</span>
-                        )}
-                        {tx.status === "failed" && (
-                          <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 6, background: "rgba(255,60,60,0.08)", border: "1px solid rgba(255,60,60,0.18)", color: "rgba(255,100,100,0.80)", fontWeight: 500 }}>Failed</span>
-                        )}
+        <>
+          {Object.entries(grouped).map(([date, txs], gi) => (
+            <motion.div key={date} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: gi * 0.055, duration: 0.26 }}>
+              <span style={T.label}>{date}</span>
+              <GlassCard elevated style={{ overflow: "hidden" }}>
+                {txs.map((tx, idx) => (
+                  <div key={tx.hash + idx}>
+                    <motion.button
+                      type="button"
+                      aria-label={`${tx.type === "receive" ? "Received" : "Sent"} ${tx.asset} transaction details`}
+                      onClick={() => setSelectedTx(tx)}
+                      whileHover={{ backgroundColor: "rgba(255,255,255,0.025)" }}
+                      transition={{ duration: 0.12 }}
+                      style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "15px 18px", cursor: "pointer", border: "none", backgroundColor: "rgba(255,255,255,0)", fontFamily: "inherit", textAlign: "left" }}
+                    >
+                      <div style={{
+                        width: 40, height: 40, borderRadius: 13, flexShrink: 0,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        background: tx.type === "receive" ? "rgba(120,220,90,0.07)" : "rgba(255,255,255,0.04)",
+                        border: "1px solid rgba(255,255,255,0.09)", borderTop: "1px solid rgba(255,255,255,0.17)",
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.07)",
+                      }}>
+                        <CryptoIcon symbol={tx.asset} image={tx.tokenImage} size={20} />
                       </div>
-                      <div style={{ fontSize: 11, fontFamily: "monospace", color: "rgba(255,255,255,0.22)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {tx.type === "receive"
-                          ? `From ${tx.from.slice(0,8)}…${tx.from.slice(-6)}`
-                          : `To ${tx.to.slice(0,8)}…${tx.to.slice(-6)}`
-                        }
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                          <span style={{ fontSize: 14, fontWeight: 500, color: "#fff", textTransform: "capitalize" }}>
+                            {tx.type === "receive" ? "Received" : "Sent"}
+                          </span>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.45)" }}>{tx.asset}</span>
+                          {tx.status === "pending" && (
+                            <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 6, background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.20)", color: "rgba(251,191,36,0.80)", fontWeight: 500 }}>Pending</span>
+                          )}
+                          {tx.status === "failed" && (
+                            <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 6, background: "rgba(255,60,60,0.08)", border: "1px solid rgba(255,60,60,0.18)", color: "rgba(255,100,100,0.80)", fontWeight: 500 }}>Failed</span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 11, fontFamily: "monospace", color: "rgba(255,255,255,0.22)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {tx.type === "receive"
+                            ? `From ${tx.from.slice(0,8)}…${tx.from.slice(-6)}`
+                            : `To ${tx.to.slice(0,8)}…${tx.to.slice(-6)}`
+                          }
+                        </div>
                       </div>
-                    </div>
-
-                    {/* Amount */}
-                    <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, fontVariantNumeric: "tabular-nums", marginBottom: 3, lineHeight: 1, color: tx.type === "receive" ? "rgba(120,220,90,0.90)" : "rgba(255,255,255,0.60)" }}>
-                        {tx.type === "receive" ? "+" : "−"}{formatCrypto(tx.amount, 6)} {tx.asset}
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, fontVariantNumeric: "tabular-nums", marginBottom: 3, lineHeight: 1, color: tx.type === "receive" ? "rgba(120,220,90,0.90)" : "rgba(255,255,255,0.60)" }}>
+                          {tx.type === "receive" ? "+" : "−"}{formatCrypto(tx.amount, 6)} {tx.asset}
+                        </div>
+                        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.24)", fontVariantNumeric: "tabular-nums" }}>
+                          {tx.amountUSD > 0.001 ? formatUSD(tx.amountUSD) : formatDate(tx.date)}
+                        </div>
                       </div>
-                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.24)", fontVariantNumeric: "tabular-nums" }}>
-                        {tx.amountUSD > 0.001 ? formatUSD(tx.amountUSD) : formatDate(tx.date)}
-                      </div>
-                    </div>
-                  </motion.button>
-                  {idx < txs.length - 1 && <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "0 18px" }} />}
-                </div>
-              ))}
-            </GlassCard>
-          </motion.div>
-        ))
+                    </motion.button>
+                    {idx < txs.length - 1 && <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "0 18px" }} />}
+                  </div>
+                ))}
+              </GlassCard>
+            </motion.div>
+          ))}
+          {hasMore && (
+            <GlassButton variant="default" size="md" onClick={() => setVisibleCount((count) => count + PAGE_SIZE)} style={{ alignSelf: "center", minWidth: 160 }}>
+              Show more
+            </GlassButton>
+          )}
+        </>
       )}
       <AnimatePresence>
         {selectedTx && <TxDetailsModal tx={selectedTx} onClose={() => setSelectedTx(null)} />}

@@ -20,6 +20,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 2800);
   }, []);
 
+  const dismiss = useCallback((id: number) => {
+    setToasts((p) => p.filter((t) => t.id !== id));
+  }, []);
+
   return (
     <Ctx.Provider value={show}>
       {children}
@@ -67,6 +71,27 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <span style={{ fontSize: 13, fontWeight: 500, color: "rgba(255,255,255,0.88)" }}>
                 {t.message}
               </span>
+              <button
+                type="button"
+                onClick={() => dismiss(t.id)}
+                aria-label="Close toast"
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: 8,
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  background: "rgba(255,255,255,0.04)",
+                  color: "rgba(255,255,255,0.38)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  padding: 0,
+                  marginLeft: 2,
+                }}
+              >
+                <Icons.x size={11} />
+              </button>
             </motion.div>
           ))}
         </AnimatePresence>

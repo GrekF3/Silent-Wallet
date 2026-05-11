@@ -7,7 +7,9 @@ import type { EvmToken } from "./tokens";
 import type { SplToken } from "./solana";
 import { saveSession, saveWatchSession, clearSession as clearSess, type SessionMode } from "./session";
 
-export type View = "dashboard" | "transfer" | "history" | "settings" | "asset";
+export type View = "dashboard" | "asset" | "transfer" | "history" | "settings" | "ecosystem";
+export type EcosystemTab = "ramp" | "swap" | "bridge";
+export type TransferTab = "send" | "receive";
 export type LoadStatus = "idle" | "loading" | "refreshing" | "ready" | "partial" | "error";
 export type DataSource = "balances" | "prices" | "tokens" | "transactions";
 
@@ -25,6 +27,11 @@ export type AssetRef = {
   network: AssetInfo["network"];
 };
 
+export type TransferIntent = {
+  tab: TransferTab;
+  assetRef: AssetRef;
+};
+
 export type AssetInfo = {
   id:        string;
   symbol:    string;
@@ -35,6 +42,7 @@ export type AssetInfo = {
   change24h: number;
   change7d:  number;
   spark7d:   number[];
+  spark7dTimestamps: number[];
   image:     string;
   desc:      string;
 };
@@ -84,6 +92,11 @@ type WalletStore = {
 
   view:          View;
   setView:       (v: View) => void;
+  transferIntent: TransferIntent | null;
+  openTransfer:  (tab?: TransferTab, assetRef?: AssetRef | null) => void;
+  clearTransferIntent: () => void;
+  ecosystemTab:  EcosystemTab;
+  setEcosystemTab: (tab: EcosystemTab) => void;
   selectedAssetRef: AssetRef | null;
   selectedAsset: AssetInfo | null;
   openAsset:     (a: AssetInfo) => void;
@@ -127,13 +140,18 @@ export const useWalletStore = create<WalletStore>((set) => ({
   addresses: null,
   setSession: (mnemonic, addresses) => { saveSession(mnemonic, addresses); set({ sessionMode: "wallet", watchName: null, mnemonic, addresses }); },
   setWatchSession: (watchName, addresses) => { saveWatchSession(watchName, addresses); set({ sessionMode: "watch", watchName, mnemonic: null, addresses, view: "dashboard" }); },
-  clearSession: () => { clearSess(); set({ sessionMode: "wallet", watchName: null, mnemonic: null, addresses: null, assets: [], evmTokens: [], splTokens: [], transactions: [], selectedAssetRef: null, selectedAsset: null, initialLoaded: false, lastUpdated: null }); },
+  clearSession: () => { clearSess(); set({ sessionMode: "wallet", watchName: null, mnemonic: null, addresses: null, assets: [], evmTokens: [], splTokens: [], transactions: [], selectedAssetRef: null, selectedAsset: null, transferIntent: null, initialLoaded: false, lastUpdated: null }); },
 
   network:    "mainnet",
-  setNetwork: (network) => set({ network, assets: [], evmTokens: [], splTokens: [], transactions: [], selectedAssetRef: null, selectedAsset: null, initialLoaded: false, lastUpdated: null }),
+  setNetwork: (network) => set({ network, assets: [], evmTokens: [], splTokens: [], transactions: [], selectedAssetRef: null, selectedAsset: null, transferIntent: null, initialLoaded: false, lastUpdated: null }),
 
   view:          "dashboard",
   setView:       (view) => set({ view }),
+  transferIntent: null,
+  openTransfer:  (tab = "send", assetRef = null) => set({ view: "transfer", transferIntent: assetRef ? { tab, assetRef } : null }),
+  clearTransferIntent: () => set({ transferIntent: null }),
+  ecosystemTab:  "ramp",
+  setEcosystemTab: (ecosystemTab) => set({ ecosystemTab, view: "ecosystem" }),
   selectedAssetRef: null,
   selectedAsset: null,
   openAsset:     (a) => set({ selectedAssetRef: { kind: "native", id: a.id, network: a.network }, selectedAsset: a, view: "asset" }),

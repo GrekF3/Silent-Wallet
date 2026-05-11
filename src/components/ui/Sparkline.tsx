@@ -9,7 +9,21 @@ type SparklineProps = {
 };
 
 export function Sparkline({ data, width = 80, height = 32, positive }: SparklineProps) {
-  if (data.length < 2) return null;
+  if (data.length < 2) {
+    const y = Math.round(height / 2);
+    return (
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ overflow: "visible", display: "block" }}>
+        <path
+          d={`M 0 ${y} L ${width} ${y}`}
+          fill="none"
+          stroke="rgba(255,255,255,0.12)"
+          strokeWidth="1.2"
+          strokeLinecap="round"
+          strokeDasharray="3 5"
+        />
+      </svg>
+    );
+  }
 
   const min = Math.min(...data);
   const max = Math.max(...data);
@@ -27,7 +41,7 @@ export function Sparkline({ data, width = 80, height = 32, positive }: Sparkline
   const fillC = positive === false ? "rgba(255,100,100,0.08)" : "rgba(255,255,255,0.06)";
 
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ overflow: "visible" }}>
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ overflow: "visible", display: "block" }}>
       <path d={fill} fill={fillC} />
       <motion.path
         d={d}

@@ -121,9 +121,15 @@ body {
 }
 
 /* ─── Scrollbar ─────────────────────────────────────────────── */
-::-webkit-scrollbar        { width: 4px; }
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.08) transparent;
+}
+
+::-webkit-scrollbar        { width: 3px; height: 3px; }
 ::-webkit-scrollbar-track  { background: transparent; }
-::-webkit-scrollbar-thumb  { background: rgba(255,255,255,0.09); border-radius: 2px; }
+::-webkit-scrollbar-thumb  { background: rgba(255,255,255,0.08); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
 
 /* ─── Focus ─────────────────────────────────────────────────── */
 :focus-visible {
@@ -308,6 +314,7 @@ body {
 .view-shell {
   width: 100%;
   max-width: 760px;
+  margin: 0 auto;
 }
 
 .view-center-shell {
@@ -443,6 +450,20 @@ body {
   margin: -4px auto 0;
 }
 
+.app-update-notice-wrap {
+  position: fixed;
+  right: 24px;
+  bottom: 28px;
+  z-index: 9997;
+  width: min(448px, calc(100vw - 48px));
+  pointer-events: none;
+}
+
+.app-update-notice-wrap > div {
+  width: 100%;
+  pointer-events: auto;
+}
+
 @media (min-width: 768px) {
   .bottom-nav {
     display: none;
@@ -454,6 +475,20 @@ body {
 }
 
 @media (max-width: 767px) {
+  .app-update-notice-wrap {
+    left: 0;
+    right: 0;
+    bottom: 84px;
+    width: auto;
+    display: flex;
+    justify-content: center;
+    padding: 0 14px;
+  }
+
+  .app-update-notice-wrap > div {
+    width: min(448px, 100%);
+  }
+
   .app-shell {
     height: 100dvh !important;
   }
@@ -502,6 +537,10 @@ body {
 
   .topbar-address svg {
     display: block;
+  }
+
+  .topbar-address-text {
+    display: none;
   }
 
   .dashboard-popover {

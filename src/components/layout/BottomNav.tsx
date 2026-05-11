@@ -12,6 +12,7 @@ type NavItem = {
 
 const NAV: NavItem[] = [
   { id: "dashboard", label: "Home",     icon: "grid"     },
+  { id: "ecosystem", label: "Web3",     icon: "globe"    },
   { id: "transfer",  label: "Transfer", icon: "swap"     },
   { id: "history",   label: "History",  icon: "clock"    },
   { id: "settings",  label: "Settings", icon: "settings" },

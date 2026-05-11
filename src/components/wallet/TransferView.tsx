@@ -14,7 +14,7 @@ import { bitcoinAddressForNetwork, sendBtc } from "@/lib/bitcoin";
 import { sendSol } from "@/lib/solana";
 import { formatUSD, formatCrypto } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
-import type { AssetInfo } from "@/lib/store";
+import type { AssetInfo, AssetRef } from "@/lib/store";
 import type { EvmToken } from "@/lib/tokens";
 import type { SplToken } from "@/lib/solana";
 
@@ -28,20 +28,23 @@ type PickAsset = {
   network:  "ethereum" | "bsc" | "bitcoin" | "solana";
   image:    string;
   isToken:  boolean;
+  ref:      AssetRef;
   tokenKind?: "evm" | "spl";
   contract?: `0x${string}`;
   decimals?: number;
 };
 
 function fromNative(a: AssetInfo): PickAsset {
-  return { id: a.id, symbol: a.symbol, name: a.name, balance: a.balance, priceUSD: a.priceUSD, network: a.network, image: a.image, isToken: false };
+  return { id: a.id, symbol: a.symbol, name: a.name, balance: a.balance, priceUSD: a.priceUSD, network: a.network, image: a.image, isToken: false, ref: { kind: "native", id: a.id, network: a.network } };
 }
 function fromEvmToken(t: EvmToken): PickAsset {
+  const network = t.chain === "bsc" ? "bsc" : "ethereum";
   return {
     id: `tok_${t.contract}`, symbol: t.symbol, name: t.name,
     balance: t.balance, priceUSD: t.priceUSD,
-    network: t.chain === "bsc" ? "bsc" : "ethereum",
+    network,
     image: t.image, isToken: true, tokenKind: "evm",
+    ref: { kind: "evm", id: t.contract.toLowerCase(), network },
     contract: t.contract as `0x${string}`,
     decimals: t.decimals,
   };
@@ -52,11 +55,16 @@ function fromSplToken(t: SplToken): PickAsset {
     id: `spl_${t.mint}`, symbol, name: t.name ?? symbol,
     balance: t.amount, priceUSD: t.priceUSD ?? 0,
     network: "solana", image: t.logoURI ?? "", isToken: true, tokenKind: "spl",
+    ref: { kind: "spl", id: t.mint, network: "solana" },
   };
 }
 
 function canSendAsset(asset: PickAsset) {
   return !asset.isToken || asset.tokenKind === "evm";
+}
+
+function sameAssetRef(asset: PickAsset, ref: AssetRef) {
+  return asset.ref.kind === ref.kind && asset.ref.network === ref.network && asset.ref.id.toLowerCase() === ref.id.toLowerCase();
 }
 
 /* ── Constants ─────────────────────────────────────────────────── */
@@ -325,7 +333,7 @@ function Row({ label, value, mono, last }: { label: string; value: string; mono?
 
 /* ── MAIN ────────────────────────────────────────────────────────── */
 export function TransferView() {
-  const { assets, evmTokens, splTokens, addresses, mnemonic, network, setTxs, hiddenAssetIds } = useWalletStore();
+  const { assets, evmTokens, splTokens, addresses, mnemonic, network, setTxs, hiddenAssetIds, transferIntent, clearTransferIntent } = useWalletStore();
   const toast = useToast();
 
   // All picker assets: native + ERC-20 tokens
@@ -346,8 +354,27 @@ export function TransferView() {
   const [gasFee,  setGasFee]  = useState<number | null>(null);
   const pickerAssets = useMemo(() => tab === "send" ? allAssets.filter(canSendAsset) : allAssets, [allAssets, tab]);
 
+  useEffect(() => {
+    if (!transferIntent || allAssets.length === 0) return;
+
+    const targetAsset = allAssets.find((candidate) => sameAssetRef(candidate, transferIntent.assetRef));
+    const nextTab = transferIntent.tab === "send" && targetAsset && !canSendAsset(targetAsset) ? "receive" : transferIntent.tab;
+
+    queueMicrotask(() => {
+      setTab(nextTab);
+      setStep("form");
+      setAmount("");
+      setToAddr("");
+      setTxHash("");
+      setError("");
+      if (targetAsset) setAsset(targetAsset);
+      clearTransferIntent();
+    });
+  }, [allAssets, clearTransferIntent, transferIntent]);
+
   // Initialise asset once assets load
   useEffect(() => {
+    if (transferIntent) return;
     if (pickerAssets.length === 0) return;
     const nextAsset = !asset || !pickerAssets.some((a) => a.id === asset.id)
       ? pickerAssets[0]
@@ -357,7 +384,7 @@ export function TransferView() {
       setAsset(nextAsset);
       if (asset) setAmount("");
     });
-  }, [pickerAssets, asset]);
+  }, [pickerAssets, asset, transferIntent]);
 
   const switchTab = (t: Tab) => { setTab(t); setStep("form"); setError(""); setAmount(""); setToAddr(""); setTxHash(""); };
 
