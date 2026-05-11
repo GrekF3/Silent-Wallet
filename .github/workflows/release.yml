@@ -10,11 +10,33 @@ permissions:
   contents: write
 
 jobs:
+  prepare-release:
+    name: Prepare release
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.release.outputs.release_id }}
+    steps:
+      - name: Create release
+        id: release
+        run: |
+          set -euo pipefail
+          tag="${{ github.ref_name }}"
+
+          if ! gh release view "$tag" --repo "$GH_REPO" >/dev/null 2>&1; then
+            gh release create "$tag" --repo "$GH_REPO" --title "Silent Wallet $tag" --notes "" --latest
+          fi
+
+          release_id="$(gh release view "$tag" --repo "$GH_REPO" --json databaseId --jq .databaseId)"
+          echo "release_id=$release_id" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+
   desktop:
     name: Desktop ${{ matrix.platform }}
+    needs: prepare-release
     strategy:
       fail-fast: false
-      max-parallel: 1
       matrix:
         include:
           - platform: macos-latest
@@ -39,10 +61,12 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
+          releaseId: ${{ needs.prepare-release.outputs.release_id }}
           tagName: ${{ github.ref_name }}
           releaseName: "Silent Wallet ${{ github.ref_name }}"
           releaseDraft: false
           prerelease: false
+          includeUpdaterJson: false
           args: ${{ matrix.args }}
 
   android:
@@ -70,8 +94,8 @@ jobs:
           path: android/app/build/outputs/apk/debug/*.apk
 
   android-release-asset:
-    name: Platform release assets
-    needs: [desktop, android]
+    name: Finalize release assets
+    needs: [prepare-release, desktop, android]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -98,9 +122,12 @@ jobs:
 
           shopt -s nullglob
           win_setup=(release-assets/Silent.Wallet_*_x64-setup.exe)
+          win_setup_sig=(release-assets/Silent.Wallet_*_x64-setup.exe.sig)
           win_msi=(release-assets/Silent.Wallet_*_x64_en-US.msi)
+          win_msi_sig=(release-assets/Silent.Wallet_*_x64_en-US.msi.sig)
           mac_dmg=(release-assets/Silent.Wallet_*_universal.dmg)
           mac_app=(release-assets/Silent.Wallet_universal.app.tar.gz)
+          mac_app_sig=(release-assets/Silent.Wallet_universal.app.tar.gz.sig)
 
           if [ ${#win_setup[@]} -gt 0 ]; then
             cp "${win_setup[0]}" platform-assets/Silent-Wallet-win-x64-setup.exe
@@ -115,6 +142,43 @@ jobs:
             cp "${mac_app[0]}" platform-assets/Silent-Wallet-mac-universal.app.tar.gz
           fi
 
+          asset_url() {
+            local file_name
+            file_name="$(basename "$1")"
+            printf 'https://github.com/%s/releases/download/%s/%s' "$GH_REPO" "$tag" "$file_name"
+          }
+
+          sig_json() {
+            jq -Rs . < "$1"
+          }
+
+          published_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          version="${tag#v}"
+          mac_url="$(asset_url "${mac_app[0]}")"
+          mac_sig="$(sig_json "${mac_app_sig[0]}")"
+          win_msi_url="$(asset_url "${win_msi[0]}")"
+          win_msi_sig="$(sig_json "${win_msi_sig[0]}")"
+          win_setup_url="$(asset_url "${win_setup[0]}")"
+          win_setup_sig="$(sig_json "${win_setup_sig[0]}")"
+
+          cat > latest.json <<JSON
+          {
+            "version": "$version",
+            "notes": "",
+            "pub_date": "$published_at",
+            "platforms": {
+              "darwin-aarch64": { "signature": $mac_sig, "url": "$mac_url" },
+              "darwin-x86_64": { "signature": $mac_sig, "url": "$mac_url" },
+              "darwin-aarch64-app": { "signature": $mac_sig, "url": "$mac_url" },
+              "darwin-x86_64-app": { "signature": $mac_sig, "url": "$mac_url" },
+              "windows-x86_64": { "signature": $win_msi_sig, "url": "$win_msi_url" },
+              "windows-x86_64-msi": { "signature": $win_msi_sig, "url": "$win_msi_url" },
+              "windows-x86_64-nsis": { "signature": $win_setup_sig, "url": "$win_setup_url" }
+            }
+          }
+          JSON
+
+          jq . latest.json > platform-assets/latest.json
           gh release upload "$tag" platform-assets/* --repo "$GH_REPO" --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
