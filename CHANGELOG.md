@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.4
+
+- macOS release packaging fix.
+- Wallet creation stability hotfix.
+- Safer encrypted storage fallback.
+
 ## 0.1.3
 
 - macOS wallet creation fix.

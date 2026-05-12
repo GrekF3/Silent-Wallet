@@ -5,6 +5,11 @@ export const DEFAULT_UPDATE_DOWNLOAD_URL =
   process.env.NEXT_PUBLIC_UPDATE_DOWNLOAD_URL || "https://github.com/GrekF3/Silent-Wallet/releases/latest";
 
 export const CHANGELOG_BY_VERSION: Record<string, string[]> = {
+  "0.1.4": [
+    "macOS release packaging fix.",
+    "Wallet creation stability hotfix.",
+    "Safer encrypted storage fallback.",
+  ],
   "0.1.3": [
     "macOS wallet creation fix.",
     "Safer encrypted storage fallback.",
