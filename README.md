@@ -119,6 +119,8 @@ Tagged releases (`v*.*.*`) run GitHub Actions to build desktop artifacts and an 
 
 The in-app update notice is closeable. On desktop it uses Tauri's signed updater package; outside Tauri it falls back to `NEXT_PUBLIC_UPDATE_DOWNLOAD_URL`.
 
+macOS releases need Apple Developer ID signing and notarization to open without Gatekeeper warnings. Add these GitHub Actions secrets before publishing a public macOS build: `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD`, and `APPLE_TEAM_ID`.
+
 Updating over the same app identifier (`app.silent.wallet`) is intended to preserve wallet data. Avoid uninstall options that remove app data unless the seed phrase is backed up.
 
 ## Security
