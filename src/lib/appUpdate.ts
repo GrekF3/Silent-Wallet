@@ -5,6 +5,11 @@ export const DEFAULT_UPDATE_DOWNLOAD_URL =
   process.env.NEXT_PUBLIC_UPDATE_DOWNLOAD_URL || "https://github.com/GrekF3/Silent-Wallet/releases/latest";
 
 export const CHANGELOG_BY_VERSION: Record<string, string[]> = {
+  "0.1.3": [
+    "macOS wallet creation fix.",
+    "Safer encrypted storage fallback.",
+    "Unlock stability improvements.",
+  ],
   "0.1.2": [
     "UI refinements across wallet navigation, asset views, history, and loading states.",
     "Web3 added with Buy, Sell, Swap, and Bridge flows inside the wallet.",

@@ -16,7 +16,7 @@ export function Lock({ onUnlock }: { onUnlock: () => void }) {
   const [loading,  setLoading]  = useState(false);
 
   const unlock = async () => {
-    if (!password) return;
+    if (!password || loading) return;
     setLoading(true);
     setError("");
     try {

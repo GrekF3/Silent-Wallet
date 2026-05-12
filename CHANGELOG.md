@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.3
+
+- macOS wallet creation fix.
+- Safer encrypted storage fallback.
+- Unlock stability improvements.
+
 ## 0.1.2
 
 - UI refinements across wallet navigation, asset views, history, and loading states.

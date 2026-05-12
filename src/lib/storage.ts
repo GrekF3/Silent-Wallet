@@ -5,6 +5,8 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { deleteNativeSecret, hasNativeWalletMarker, readNativeSecret, writeNativeSecret } from "./nativeStorage";
 
 const STORAGE_KEY = "silent_wallet_v1";
+const NATIVE_STORAGE_TIMEOUT_MS = 4_500;
+const NATIVE_DELETE_TIMEOUT_MS = 3_000;
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
@@ -39,6 +41,28 @@ function bufferBytes(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
   return new Uint8Array(Array.from(bytes));
 }
 
+async function nativeWithTimeout<T>(operation: Promise<T>, fallback: T, timeoutMs = NATIVE_STORAGE_TIMEOUT_MS): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<T>((resolve) => {
+        timeoutId = setTimeout(() => resolve(fallback), timeoutMs);
+      }),
+    ]);
+  } catch {
+    return fallback;
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
+async function saveEncodedSecret(encoded: string, password: string): Promise<void> {
+  const wroteNative = await nativeWithTimeout(writeNativeSecret(encoded, password), false);
+  if (!wroteNative) localStorage.setItem(STORAGE_KEY, encoded);
+}
+
 async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
   if (!hasSubtleCrypto()) throw new Error("Web Crypto is unavailable");
   const subtle = globalThis.crypto.subtle;
@@ -71,7 +95,7 @@ export async function saveMnemonic(mnemonic: string, password: string): Promise<
       ct: Array.from(ct),
     };
     const encoded = JSON.stringify(payload);
-    if (!(await writeNativeSecret(encoded, password))) localStorage.setItem(STORAGE_KEY, encoded);
+    await saveEncodedSecret(encoded, password);
     return;
   }
 
@@ -87,11 +111,12 @@ export async function saveMnemonic(mnemonic: string, password: string): Promise<
     ct:   Array.from(new Uint8Array(ct)),
   };
   const encoded = JSON.stringify(payload);
-  if (!(await writeNativeSecret(encoded, password))) localStorage.setItem(STORAGE_KEY, encoded);
+  await saveEncodedSecret(encoded, password);
 }
 
 export async function loadMnemonic(password: string): Promise<string> {
-  const raw = await readNativeSecret(password) ?? localStorage.getItem(STORAGE_KEY);
+  const nativeRaw = await nativeWithTimeout(readNativeSecret(password), null);
+  const raw = nativeRaw ?? localStorage.getItem(STORAGE_KEY);
   if (!raw) throw new Error("No wallet found");
 
   const payload = JSON.parse(raw) as LegacyPayload | SecretboxPayload | (LegacyPayload & { v?: 1; alg?: string });
@@ -128,5 +153,5 @@ export function hasWallet(): boolean {
 
 export async function deleteWallet(): Promise<void> {
   localStorage.removeItem(STORAGE_KEY);
-  await deleteNativeSecret();
+  await nativeWithTimeout(deleteNativeSecret().then(() => true), false, NATIVE_DELETE_TIMEOUT_MS);
 }

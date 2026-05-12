@@ -80,6 +80,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
   };
 
   const handleSave = async () => {
+    if (loading) return;
     if (password.length < 8) { setError("Password must be at least 8 characters"); return; }
     if (password !== password2) { setError("Passwords don't match"); return; }
     setLoading(true);
@@ -256,7 +257,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
                 {error && <div style={{ fontSize: 13, color: "rgba(255,100,100,0.80)", padding: "10px 14px", borderRadius: 10, background: "rgba(255,60,60,0.07)", border: "1px solid rgba(255,60,60,0.15)" }}>{error}</div>}
               </GlassCard>
               <div style={{ display: "flex", gap: 10 }}>
-                <GlassButton variant="ghost" size="lg" style={{ flex: 1 }} onClick={() => setStep(tab === "import" ? "start" : "phrase")}>Back</GlassButton>
+                <GlassButton variant="ghost" size="lg" style={{ flex: 1 }} onClick={() => setStep(tab === "import" ? "start" : "phrase")} disabled={loading}>Back</GlassButton>
                 <GlassButton variant="primary" size="lg" style={{ flex: 1 }} onClick={handleSave} disabled={loading || !password || !password2}>
                   {loading ? "Creating…" : "Create Wallet"}
                 </GlassButton>
