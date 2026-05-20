@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { GlassButton } from "@/components/ui/GlassButton";
 import { GlassInput } from "@/components/ui/GlassInput";
+import { Skeleton } from "@/components/common/Skeleton";
 import { Icons } from "@/components/ui/Icon";
 import { useToast } from "@/components/ui/Toast";
 import { createMoonPayUrl, createTransakSession } from "@/lib/ecosystem/rampClient";
@@ -141,8 +142,14 @@ export function RampPanel({
       )}
 
       <GlassButton variant="primary" size="lg" onClick={openWidget} disabled={loading || !currentEnabled || !walletAddress} style={{ width: "100%" }}>
-        {loading ? "Preparing..." : `Open ${provider === "moonpay" ? "MoonPay" : "Transak"}`} <Icons.externalLink size={14} color="#000" />
+        {`Open ${provider === "moonpay" ? "MoonPay" : "Transak"}`} <Icons.externalLink size={14} color="#000" />
       </GlassButton>
+      {loading && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "10px 12px" }}>
+          <Skeleton width="44%" height={10} radius={6} />
+          <Skeleton width="100%" height={9} radius={6} />
+        </div>
+      )}
     </div>
   );
 }

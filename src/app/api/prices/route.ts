@@ -18,6 +18,12 @@ const FALLBACK_IMAGES: Record<string, string> = {
   USDC: "https://coin-images.coingecko.com/coins/images/6319/large/USDC.png",
 };
 
+const FRESH_MEMORY_MS = 30_000;
+const STALE_MEMORY_MS = 30 * 60_000;
+
+let lastGoodPrices: Prices | null = null;
+let lastGoodAt = 0;
+
 function emptyCoin(symbol: string): CoinData {
   return { usd: 0, usd_24h_change: 0, usd_7d_change: 0, image: FALLBACK_IMAGES[symbol] ?? "", spark7d: [], spark7dTimestamps: [] };
 }
@@ -31,7 +37,7 @@ async function fetchSpark(id: string): Promise<SparkData> {
   try {
     const r = await fetch(
       `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=7`,
-      { signal: AbortSignal.timeout(10_000), headers: serverCoinGeckoHeaders(), cache: "no-store" }
+      { signal: AbortSignal.timeout(2_500), headers: serverCoinGeckoHeaders(), cache: "no-store" }
     );
     if (!r.ok) return { prices: [], timestamps: [] };
     const d = await r.json() as { prices?: [number, number][] };
@@ -51,7 +57,7 @@ async function coinGeckoPrices(): Promise<Prices> {
   const [markets, ...sparks] = await Promise.all([
     fetch(
       `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids}&price_change_percentage=24h,7d`,
-      { signal: AbortSignal.timeout(10_000), headers: serverCoinGeckoHeaders(), cache: "no-store" }
+      { signal: AbortSignal.timeout(5_000), headers: serverCoinGeckoHeaders(), cache: "no-store" }
     ).then((r) => r.ok ? r.json() : []).catch(() => []),
     ...Object.values(COIN_IDS).map((id) => fetchSpark(id)),
   ]);
@@ -80,7 +86,7 @@ async function ankrNativePrices(): Promise<Partial<Record<"ETH" | "BNB", number>
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ankr_getBlockchainStats", params: { blockchain: ["eth", "bsc"] } }),
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(5_000),
       cache: "no-store",
     });
     if (!r.ok) return {};
@@ -102,7 +108,7 @@ async function defiLlamaPrices(): Promise<Partial<Record<string, number>>> {
   try {
     const ids = Object.values(COIN_IDS).map((id) => `coingecko:${id}`).join(",");
     const r = await fetch(`https://coins.llama.fi/prices/current/${ids}`, {
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(5_000),
       cache: "no-store",
     });
     if (!r.ok) return {};
@@ -118,24 +124,80 @@ async function defiLlamaPrices(): Promise<Partial<Record<string, number>>> {
   }
 }
 
+async function binancePrices(): Promise<Partial<Record<string, number>>> {
+  const pairs: Record<string, string> = {
+    ETHUSDT: "ETH",
+    BTCUSDT: "BTC",
+    BNBUSDT: "BNB",
+    SOLUSDT: "SOL",
+  };
+  try {
+    const symbols = encodeURIComponent(JSON.stringify(Object.keys(pairs)));
+    const r = await fetch(`https://api.binance.com/api/v3/ticker/price?symbols=${symbols}`, {
+      signal: AbortSignal.timeout(4_000),
+      cache: "no-store",
+    });
+    if (!r.ok) return {};
+    const rows = await r.json() as Array<{ symbol?: string; price?: string }>;
+    const out: Partial<Record<string, number>> = { USDC: 1 };
+    for (const row of rows) {
+      const symbol = row.symbol ? pairs[row.symbol] : undefined;
+      const price = Number(row.price ?? 0);
+      if (symbol && Number.isFinite(price) && price > 0) out[symbol] = price;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function hasUsablePrice(prices: Prices) {
+  return Object.values(prices).some((coin) => Number.isFinite(coin.usd) && coin.usd > 0);
+}
+
 export async function GET() {
-  const [prices, nativeFallback, llamaFallback] = await Promise.all([
+  const now = Date.now();
+  if (lastGoodPrices && now - lastGoodAt < FRESH_MEMORY_MS) {
+    return NextResponse.json(lastGoodPrices, {
+      headers: { "Cache-Control": "private, max-age=20", "X-Silent-Price-Source": "memory" },
+    });
+  }
+
+  const [prices, nativeFallback, llamaFallback, binanceFallback] = await Promise.all([
     coinGeckoPrices().catch(() => ({} as Prices)),
     ankrNativePrices(),
     defiLlamaPrices(),
+    binancePrices(),
   ]);
 
   const result: Prices = {};
   for (const symbol of Object.keys(COIN_IDS)) {
-    const current = prices[symbol] ?? emptyCoin(symbol);
+    const previous = lastGoodPrices?.[symbol];
+    const current = prices[symbol] ?? previous ?? emptyCoin(symbol);
     result[symbol] = {
       ...emptyCoin(symbol),
+      ...previous,
       ...current,
-      usd: current.usd || nativeFallback[symbol as "ETH" | "BNB"] || llamaFallback[symbol] || 0,
+      usd:
+        current.usd ||
+        nativeFallback[symbol as "ETH" | "BNB"] ||
+        binanceFallback[symbol] ||
+        llamaFallback[symbol] ||
+        previous?.usd ||
+        0,
     };
   }
 
+  if (hasUsablePrice(result)) {
+    lastGoodPrices = result;
+    lastGoodAt = now;
+  } else if (lastGoodPrices && now - lastGoodAt < STALE_MEMORY_MS) {
+    return NextResponse.json(lastGoodPrices, {
+      headers: { "Cache-Control": "private, max-age=20", "X-Silent-Price-Source": "stale-memory" },
+    });
+  }
+
   return NextResponse.json(result, {
-    headers: { "Cache-Control": "private, no-store" },
+    headers: { "Cache-Control": "private, max-age=20", "X-Silent-Price-Source": "live" },
   });
 }

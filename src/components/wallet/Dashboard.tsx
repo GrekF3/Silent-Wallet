@@ -12,6 +12,10 @@ import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { useWalletStore, type AssetInfo, type AssetRef } from "@/lib/store";
 import { formatUSD, formatCrypto, shortenAddress, formatDate } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
+import { EmptyState } from "@/components/common/EmptyState";
+import { AccountSelector } from "@/components/accounts/AccountSelector";
+import { useWalletAccounts } from "@/lib/accounts/storage";
+import { useUserExperience } from "@/lib/userExperience/mode";
 
 type WalletNetwork = "ethereum" | "bitcoin" | "bsc" | "solana";
 type SortMode = "value" | "name";
@@ -70,17 +74,20 @@ function assetValue(asset: DisplayAsset) {
   return asset.balance * asset.priceUSD;
 }
 
-function CleanAssetIcon({ symbol, image, size = 31 }: { symbol: string; image: string; size?: number }) {
+function safeNumberArray(value: unknown): number[] {
+  return Array.isArray(value) ? value.filter((item): item is number => typeof item === "number" && Number.isFinite(item)) : [];
+}
+
+function CleanAssetIcon({ symbol, image, size = 36 }: { symbol: string; image: string; size?: number }) {
   return (
     <div
       style={{
-        width: 42,
-        height: 42,
+        width: 44,
+        height: 44,
         flexShrink: 0,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        filter: "drop-shadow(0 8px 16px rgba(0,0,0,0.48)) drop-shadow(0 0 10px rgba(255,255,255,0.08))",
       }}
     >
       <CryptoIcon symbol={symbol} image={image} size={size} />
@@ -301,7 +308,7 @@ function ManageCoinsModal({ assets, onClose }: { assets: DisplayAsset[]; onClose
               const active = !hiddenAssetIds.includes(asset.id);
               return (
                 <div key={asset.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 13, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                  <CryptoIcon symbol={asset.symbol} image={asset.image} size={24} />
+                  <CryptoIcon symbol={asset.symbol} image={asset.image} size={32} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 650, color: "#fff" }}>{asset.symbol}</div>
                     <div style={{ fontSize: 11, color: "rgba(255,255,255,0.30)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{NET_LABEL[asset.network]} · {formatCrypto(asset.balance, 5)}</div>
@@ -322,10 +329,12 @@ const up: Variants = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, 
 
 export function Dashboard() {
   const {
-    assets, evmTokens, splTokens, addresses, loading, initialLoaded, loadingState, lastUpdated, setView, openTransfer, setEcosystemTab, openAsset,
-    sessionMode, watchName,
+    assets, evmTokens, splTokens, transactions, addresses, loading, initialLoaded, loadingState, lastUpdated, setView, openTransfer, setEcosystemTab, openAsset,
+    sessionMode, watchName, activeAccountIndex,
     privacyMode, setPrivacyMode, hideZeroBalances, setHideZeroBalances, hiddenAssetIds,
   } = useWalletStore();
+  const ux = useUserExperience();
+  const accounts = useWalletAccounts();
   const toast = useToast();
   const [search, setSearch] = useState("");
   const [networks, setNetworks] = useState<WalletNetwork[]>(NETWORKS);
@@ -344,8 +353,8 @@ export function Dashboard() {
       valueUSD: asset.balance * asset.priceUSD,
       change24h: asset.change24h,
       change7d: asset.change7d,
-      spark7d: asset.spark7d,
-      spark7dTimestamps: asset.spark7dTimestamps,
+      spark7d: safeNumberArray(asset.spark7d),
+      spark7dTimestamps: safeNumberArray(asset.spark7dTimestamps),
       image: asset.image,
       kind: "native" as const,
       assetRef: { kind: "native" as const, id: asset.id, network: asset.network },
@@ -387,7 +396,13 @@ export function Dashboard() {
 
   const activeAssets = useMemo(() => allAssets.filter((asset) => !hiddenAssetIds.includes(asset.id)), [allAssets, hiddenAssetIds]);
   const portfolioPoints = useMemo<ChartPoint[]>(() => {
-    const sources = activeAssets.filter((asset) => asset.balance > 0 && asset.spark7d.length > 1);
+    const sources = activeAssets
+      .map((asset) => ({
+        ...asset,
+        spark7d: safeNumberArray(asset.spark7d),
+        spark7dTimestamps: safeNumberArray(asset.spark7dTimestamps),
+      }))
+      .filter((asset) => asset.balance > 0 && asset.spark7d.length > 1);
     if (sources.length === 0) return [];
 
     const length = Math.min(...sources.map((asset) => asset.spark7d.length));
@@ -408,6 +423,9 @@ export function Dashboard() {
   const pct = total > 0 ? (totalChange / (total - totalChange || total)) * 100 : 0;
   const pos = pct >= 0;
   const q = search.toLowerCase().trim();
+  const recentActivity = transactions.slice(0, 3);
+  const activeAccount = accounts.find((account) => account.index === activeAccountIndex) ?? accounts[0];
+  const hasUnpricedBalance = activeAssets.some((asset) => asset.balance > 0 && asset.priceUSD <= 0);
 
   const visibleAssets = useMemo(() => activeAssets
     .filter((asset) => networks.includes(asset.network))
@@ -417,6 +435,8 @@ export function Dashboard() {
   [activeAssets, hideZeroBalances, networks, q, sortMode]);
 
   const showSkeleton = !initialLoaded && loading;
+  const priceRefreshing = loadingState.prices.status === "loading" || loadingState.prices.status === "refreshing";
+  const showTotalSkeleton = showSkeleton || (hasUnpricedBalance && (total <= 0 || priceRefreshing));
   const partialErrors = Object.entries(loadingState)
     .filter(([, state]) => state.status === "partial" || state.status === "error")
     .map(([source]) => source);
@@ -438,7 +458,9 @@ export function Dashboard() {
         <div className="dashboard-hero-row" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.28)" }}>Total Portfolio</span>
+              <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.28)" }}>
+                {watchOnly ? "Observer portfolio" : `Active account · ${activeAccount?.name ?? "Main"}`}
+              </span>
               {watchOnly && (
                 <span style={{ fontSize: 10, fontWeight: 650, padding: "2px 7px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.42)" }}>
                   Observer{watchName ? ` · ${watchName}` : ""}
@@ -450,16 +472,18 @@ export function Dashboard() {
             </div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, minHeight: 48 }}>
               <span style={{ fontSize: 14, color: "rgba(255,255,255,0.34)", fontWeight: 600 }}>≈</span>
-              {showSkeleton ? <Bone w={200} h={44} r={10} /> : privacyMode ? (
+              {showTotalSkeleton ? <Bone w={200} h={44} r={10} /> : privacyMode ? (
                 <span style={{ fontSize: "clamp(34px, 10vw, 44px)", fontWeight: 300, color: "#fff", lineHeight: 1 }}>••••••</span>
               ) : (
                 <AnimatedNumber value={total} format={formatUSD}
                   style={{ fontSize: "clamp(34px, 10vw, 44px)", fontWeight: 300, letterSpacing: "-0.025em", color: "#fff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }} />
               )}
             </div>
-            <div style={{ marginTop: 5, fontSize: 11, color: "rgba(255,255,255,0.28)" }}>Approximately</div>
+            <div style={{ marginTop: 5, fontSize: 11, color: "rgba(255,255,255,0.28)" }}>
+              {watchOnly ? "Observer mode cannot sign transactions." : activeAccount?.purpose ?? "Approximately"}
+            </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-              {!showSkeleton && !privacyMode && (
+              {!showTotalSkeleton && !privacyMode && (
                 <button
                   type="button"
                   onClick={() => setChartOpen((open) => !open)}
@@ -502,11 +526,16 @@ export function Dashboard() {
           </div>
           {!watchOnly && (
             <div className="dashboard-actions" style={{ display: "flex", gap: 8, paddingTop: 4, flexShrink: 0 }}>
-              <GlassButton variant="primary" size="md" onClick={() => setView("transfer")}><Icons.send size={13} color="#000" /> Send</GlassButton>
-              <GlassButton variant="default" size="md" onClick={() => setView("transfer")}><Icons.receive size={13} /> Receive</GlassButton>
+              <GlassButton variant="primary" size="md" onClick={() => openTransfer("send")}><Icons.send size={13} color="#000" /> Send</GlassButton>
+              <GlassButton variant="default" size="md" onClick={() => openTransfer("receive")}><Icons.receive size={13} /> Receive</GlassButton>
             </div>
           )}
         </div>
+        {!watchOnly && (
+          <div style={{ marginTop: 14, maxWidth: 260 }}>
+            <AccountSelector />
+          </div>
+        )}
       </motion.div>
 
       <AnimatePresence initial={false}>
@@ -578,6 +607,33 @@ export function Dashboard() {
       </motion.div>
 
       <motion.div variants={up}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 10 }}>
+          <GlassCard hover onClick={() => setView("accounts")} style={{ padding: 16, borderRadius: 18, cursor: "pointer" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 650, color: "#fff" }}>Account separation</div>
+                <div style={{ marginTop: 4, fontSize: 12, color: "rgba(255,255,255,0.34)" }}>Keep treasury, operations, and receiving activity distinct.</div>
+              </div>
+              <div style={{ width: 42, height: 42, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.055)", border: "1px solid rgba(255,255,255,0.09)" }}>
+                <Icons.wallet size={17} color="rgba(255,255,255,0.52)" />
+              </div>
+            </div>
+          </GlassCard>
+          <GlassCard hover onClick={() => setView("learn")} style={{ padding: 16, borderRadius: 18, cursor: "pointer" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 650, color: "#fff" }}>Academy</div>
+                <div style={{ marginTop: 4, fontSize: 12, color: "rgba(255,255,255,0.34)" }}>{ux.beginnerMode ? "Understand self-custody without noise." : "Review new recipients before sending."}</div>
+              </div>
+              <div style={{ width: 42, height: 42, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.055)", border: "1px solid rgba(255,255,255,0.09)" }}>
+                <Icons.help size={17} color="rgba(255,255,255,0.52)" />
+              </div>
+            </div>
+          </GlassCard>
+        </div>
+      </motion.div>
+
+      <motion.div variants={up}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 8, alignItems: "center" }}>
           <div style={{ position: "relative", minWidth: 0 }}>
             <div style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
@@ -598,6 +654,33 @@ export function Dashboard() {
           <NetworkFilter selected={networks} onApply={setNetworks} />
           <MoreMenu sortMode={sortMode} setSortMode={setSortMode} hideZero={hideZeroBalances} setHideZero={setHideZeroBalances} openManage={() => setManageOpen(true)} />
         </div>
+      </motion.div>
+
+      <motion.div variants={up}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.28)" }}>Recent activity</span>
+          <button onClick={() => setView("history")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "rgba(255,255,255,0.28)", cursor: "pointer", background: "none", border: "none", fontFamily: "inherit" }}>
+            View all <Icons.chevronR size={12} color="rgba(255,255,255,0.24)" />
+          </button>
+        </div>
+        <GlassCard style={{ padding: recentActivity.length ? "4px 14px" : 0, borderRadius: 18 }}>
+          {recentActivity.length ? recentActivity.map((tx, index) => (
+            <div key={tx.id ?? `${tx.hash}-${index}`} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: index === recentActivity.length - 1 ? "none" : "1px solid rgba(255,255,255,0.05)" }}>
+              <div style={{ width: 32, height: 32, borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center", background: tx.type === "receive" ? "rgba(120,220,90,0.07)" : "rgba(255,255,255,0.045)", border: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
+                {tx.type === "receive" ? <Icons.receive size={14} color="rgba(255,255,255,0.55)" /> : <Icons.send size={14} color="rgba(255,255,255,0.55)" />}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 650, color: "#fff" }}>{tx.type === "receive" ? "Received" : "Sent"} {tx.asset}</div>
+                <div style={{ marginTop: 2, fontSize: 11, color: "rgba(255,255,255,0.26)" }}>{formatDate(tx.date)}</div>
+              </div>
+              <div style={{ textAlign: "right", fontSize: 13, fontWeight: 650, color: tx.type === "receive" ? "rgba(120,220,90,0.82)" : "rgba(255,255,255,0.54)" }}>
+                {privacyMode ? "••••" : `${tx.type === "receive" ? "+" : "-"}${formatCrypto(tx.amount, 5)} ${tx.asset}`}
+              </div>
+            </div>
+          )) : (
+            <EmptyState icon="clock" title="Nothing here yet. That is okay." body="Your recent transfers will appear after the wallet indexes activity." />
+          )}
+        </GlassCard>
       </motion.div>
 
       <motion.div variants={up}>
@@ -639,12 +722,12 @@ export function Dashboard() {
                 </motion.div>
               ))}
               {visibleAssets.length === 0 && !loading && (
-                <div style={{ textAlign: "center", padding: "48px 0", color: "rgba(255,255,255,0.20)" }}>
-                  <Icons.search size={28} color="rgba(255,255,255,0.12)" />
-                  <div style={{ marginTop: 10, fontSize: 13 }}>
-                    {search ? `No results for "${search}"` : "No balances indexed yet"}
-                  </div>
-                </div>
+                <EmptyState
+                  icon={search ? "search" : "coins"}
+                  title={search ? `No results for "${search}"` : "No assets yet."}
+                  body={search ? "Try another symbol or network." : "Receive crypto or import a wallet to get started."}
+                  action={!search && !watchOnly ? { label: "Receive", onClick: () => openTransfer("receive"), icon: "receive" } : undefined}
+                />
               )}
             </motion.div>
           )}

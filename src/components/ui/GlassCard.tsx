@@ -27,8 +27,8 @@ export function GlassCard({ hover = false, elevated = false, style, children, ..
   return (
     <motion.div
       style={{
-        background:           "rgba(255,255,255,0.055)",
-        border:               "1px solid rgba(255,255,255,0.11)",
+        background:           "var(--theme-surface, rgba(255,255,255,0.055))",
+        border:               "1px solid var(--theme-border, rgba(255,255,255,0.11))",
         borderTopColor:       "rgba(255,255,255,0.22)",
         borderRadius:         20,
         backdropFilter:       "blur(32px) saturate(160%)",

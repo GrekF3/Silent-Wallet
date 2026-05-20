@@ -10,6 +10,8 @@ import { generateMnemonic, validateMnemonic, deriveAddresses } from "@/lib/walle
 import { saveMnemonic } from "@/lib/storage";
 import { useWalletStore } from "@/lib/store";
 import type { WalletAddresses } from "@/lib/wallet";
+import { useUserExperience } from "@/lib/userExperience/mode";
+import { discoverMnemonicAccounts } from "@/lib/accounts/discovery";
 
 type Tab  = "create" | "import" | "watch";
 type Step = "start" | "phrase" | "confirm" | "password";
@@ -52,6 +54,7 @@ function WordGrid({ words }: { words: string[] }) {
 
 export function Setup({ onDone }: { onDone: () => void }) {
   const { setSession, setWatchSession } = useWalletStore();
+  const ux = useUserExperience();
   const [tab,      setTab]      = useState<Tab>("create");
   const [step,     setStep]     = useState<Step>("start");
   const [mnemonic, setMnemonic] = useState("");
@@ -89,6 +92,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
       await saveMnemonic(mnemonic, password);
       const addresses = deriveAddresses(mnemonic);
       setSession(mnemonic, addresses);
+      if (tab === "import") void discoverMnemonicAccounts(mnemonic);
       onDone();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save wallet");
@@ -160,6 +164,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
                       <Icons.shield size={18} color="rgba(255,255,255,0.50)" />
                       <p style={{ fontSize: 13, color: "rgba(255,255,255,0.50)", lineHeight: 1.5 }}>
                         A new 12-word seed phrase will be generated. Write it down and keep it safe — it&apos;s the only way to recover your wallet.
+                        {ux.beginnerMode ? " Silent Wallet never sends it to a server." : ""}
                       </p>
                     </div>
                     <GlassButton variant="primary" size="lg" style={{ width: "100%" }} onClick={handleCreate}>
@@ -169,6 +174,12 @@ export function Setup({ onDone }: { onDone: () => void }) {
                 ) : tab === "import" ? (
                   <>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <div style={{ display: "flex", gap: 10, padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", marginBottom: 10 }}>
+                        <Icons.shield size={15} color="rgba(255,255,255,0.48)" />
+                        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.44)", lineHeight: 1.5 }}>
+                          Import only on a device you trust. Silent Wallet uses the phrase locally to restore your wallet.
+                        </p>
+                      </div>
                       <label style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.30)" }}>
                         Seed Phrase
                       </label>

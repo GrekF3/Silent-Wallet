@@ -56,11 +56,22 @@ function slip10Child(parent: HdNode, index: number): HdNode {
   return { key: I.slice(0, 32), chainCode: I.slice(32) };
 }
 
-/* ── Key derivation (m/44'/501'/0'/0') ──────────────────────────── */
-export function deriveSolanaKeypair(mnemonic: string): { address: string; secretKey: Uint8Array } {
+function safeAccountIndex(accountIndex = 0) {
+  return Number.isInteger(accountIndex) && accountIndex >= 0 ? accountIndex : 0;
+}
+
+function pathAccountIndex(accountIndex = 0, addressIndex = 0) {
+  const account = safeAccountIndex(accountIndex);
+  const address = Number.isInteger(addressIndex) && addressIndex >= 0 ? addressIndex : 0;
+  if (address === 0) return account;
+  return 10_000 + account * 1_000 + address;
+}
+
+/* ── Key derivation (m/44'/501'/{account/address}'/0') ───────────── */
+export function deriveSolanaKeypair(mnemonic: string, accountIndex = 0, addressIndex = 0): { address: string; secretKey: Uint8Array } {
   const seed = bip39.mnemonicToSeedSync(mnemonic.trim());
   let node = slip10Master(seed);
-  for (const i of [44, 501, 0, 0]) node = slip10Child(node, i);
+  for (const i of [44, 501, pathAccountIndex(accountIndex, addressIndex), 0]) node = slip10Child(node, i);
   const kp = nacl.sign.keyPair.fromSeed(node.key);
   return { address: encodeBase58(kp.publicKey), secretKey: kp.secretKey };
 }
@@ -133,8 +144,8 @@ function concatBytes(parts: Uint8Array[]): Uint8Array {
   return out;
 }
 
-export async function sendSol(params: { mnemonic: string; to: string; amount: string; network: Network }): Promise<string> {
-  const kp = deriveSolanaKeypair(params.mnemonic);
+export async function sendSol(params: { mnemonic: string; to: string; amount: string; network: Network; accountIndex?: number; addressIndex?: number }): Promise<string> {
+  const kp = deriveSolanaKeypair(params.mnemonic, params.accountIndex ?? 0, params.addressIndex ?? 0);
   const from = decodeBase58(kp.address);
   const to = decodeBase58(params.to);
   const system = decodeBase58(SYSTEM_PROGRAM);

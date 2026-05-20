@@ -1,47 +1,9 @@
 import { isAddress } from "viem";
 import { isNativeTokenAddress } from "./chains";
-
-const FORBIDDEN_KEYS = new Set([
-  "mnemonic",
-  "privatekey",
-  "seed",
-  "secret",
-  "recoveryphrase",
-  "secretrecoveryphrase",
-]);
-
-export type GuardResult = { ok: true } | { ok: false; key: string };
+export { assertNoForbiddenSensitiveKeys, detectForbiddenSensitiveKeys } from "@/lib/security/sensitiveGuards";
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-export function detectForbiddenSensitiveKeys(value: unknown): GuardResult {
-  const seen = new WeakSet<object>();
-  const visit = (node: unknown): GuardResult => {
-    if (!node || typeof node !== "object") return { ok: true };
-    if (seen.has(node)) return { ok: true };
-    seen.add(node);
-    if (Array.isArray(node)) {
-      for (const item of node) {
-        const result = visit(item);
-        if (!result.ok) return result;
-      }
-      return { ok: true };
-    }
-    for (const [key, nested] of Object.entries(node)) {
-      if (FORBIDDEN_KEYS.has(key.toLowerCase())) return { ok: false, key };
-      const result = visit(nested);
-      if (!result.ok) return result;
-    }
-    return { ok: true };
-  };
-  return visit(value);
-}
-
-export function assertNoForbiddenSensitiveKeys(value: unknown): void {
-  const result = detectForbiddenSensitiveKeys(value);
-  if (!result.ok) throw new Error(`Request body contains forbidden sensitive key: ${result.key}`);
 }
 
 export function validateEvmAddress(value: unknown, label = "address"): `0x${string}` {

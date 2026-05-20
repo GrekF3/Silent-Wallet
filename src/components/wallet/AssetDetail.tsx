@@ -61,12 +61,11 @@ export function AssetDetail() {
 
         <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
           <div style={{
-            width: 42, height: 42, flexShrink: 0,
+            width: 50, height: 50, flexShrink: 0,
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 17, fontWeight: 700, color: "#fff",
-            filter: "drop-shadow(0 9px 18px rgba(0,0,0,0.52)) drop-shadow(0 0 11px rgba(255,255,255,0.08))",
           }}>
-            <CryptoIcon symbol={a.symbol} image={a.image} size={33} />
+            <CryptoIcon symbol={a.symbol} image={a.image} size={42} />
           </div>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

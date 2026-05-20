@@ -2,9 +2,11 @@
 
 Open-source self-custodial crypto wallet for ETH, BTC, BNB Chain, and Solana.
 
+Silent Wallet is built to feel calm and useful for real people. The free wallet stays strong: create, import, watch, send, receive, default account, basic portfolio, basic history, Academy, address book, privacy mode, and beginner guidance are not premium features.
+
 ## Status
 
-Beta. The wallet already supports create/import, Observer watch-only mode, privacy balance hiding, balances, prices, token discovery, transaction history, receive, send, testnets, lock/reset, and local encryption.
+Beta. The wallet supports create/import, Observer watch-only mode, beginner onboarding, Academy, local HD accounts, local address book, privacy controls, balances, prices, token discovery, transaction history, receive, send, testnets, lock/reset, and local encryption.
 
 ## Architecture
 
@@ -15,6 +17,41 @@ Beta. The wallet already supports create/import, Observer watch-only mode, priva
 - **Web3 proxy:** Provider route handlers under `src/app/api/ecosystem/*`.
 
 Seed phrases and private keys stay on the device. The data proxy only receives public addresses, chain/network parameters, and price/history queries.
+
+## Product Experience
+
+- **Home:** calm command center with active account context, portfolio value, network state, quick actions, assets, recent activity, and clear empty states.
+- **Accounts:** local HD account manager for purpose-based accounts such as Main, Treasury, Long Term, Operations, and Watch. Metadata only is stored locally.
+- **Address slots:** Silent Pro can derive additional per-network addresses inside an account. The app stores only labels and address indexes, never private keys.
+- **Beginner Mode:** optional local preference that adds simpler explanations and stronger transaction prompts.
+- **Academy:** short practical articles about wallets, seed phrases, gas, addresses, swaps, bridges, and scams.
+- **Address Book:** local contacts, labels, notes, trusted markers, and send-flow warnings.
+- **Privacy Panel:** hides balances, addresses, and activity values on screen. Account separation helps reduce accidental linkage, but it does not make blockchain transactions anonymous.
+
+## Silent Pro
+
+Silent Pro unlocks advanced custody operations: multiple HD accounts, account separation, privacy profiles, trusted transfer workflows, watch dashboards, CSV exports, transaction templates, and reporting placeholders.
+
+Core wallet usage and core security features stay free. The current license system is a manual MVP without Stripe, Paddle, RevenueCat, Apple IAP, Google Play Billing, or any payment processor.
+
+Environment:
+
+```bash
+NEXT_PUBLIC_PREMIUM_ENABLED=true
+NEXT_PUBLIC_PREMIUM_PURCHASE_URL=https://swallet.site/
+NEXT_PUBLIC_DEV_PREMIUM=false
+PREMIUM_LICENSE_HASHES=
+PREMIUM_LICENSE_SALT=
+NEXT_PUBLIC_DEFAULT_BEGINNER_MODE=true
+```
+
+Create a manual license hash:
+
+```bash
+node scripts/hash-license.mjs "SW-PRO-XXXX-XXXX" "your-salt"
+```
+
+Put the printed hash in `PREMIUM_LICENSE_HASHES` and the salt in `PREMIUM_LICENSE_SALT`.
 
 ## Web3
 
@@ -77,6 +114,9 @@ More details:
 - `docs/ECOSYSTEM.md`
 - `docs/MONETIZATION.md`
 - `docs/SECURITY_ECOSYSTEM.md`
+- `docs/PRODUCT_EXPERIENCE.md`
+- `docs/SILENT_PRO.md`
+- `docs/LICENSE_KEYS.md`
 
 ## Storage
 

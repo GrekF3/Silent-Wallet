@@ -10,7 +10,10 @@ import { useWalletStore } from "@/lib/store";
 import { refreshWalletData } from "@/lib/walletRefresh";
 import { formatUSD, formatCrypto, formatDate, formatDateDay } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
+import { SkeletonRow } from "@/components/common/Skeleton";
 import type { ChainTx } from "@/lib/chains";
+import { findAddressBookContact } from "@/lib/addressBook/storage";
+import { TransactionNotes } from "@/components/transactions/TransactionNotes";
 
 type Filter = "all" | "send" | "receive";
 const FILTERS: { id: Filter; label: string }[] = [
@@ -19,13 +22,6 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "send",    label: "Sent"     },
 ];
 const PAGE_SIZE = 20;
-
-function Bone({ w, h, r = 8 }: { w: number | string; h: number; r?: number }) {
-  return (
-    <motion.div animate={{ opacity: [0.25, 0.5, 0.25] }} transition={{ duration: 1.8, repeat: Infinity }}
-      style={{ width: w, height: h, borderRadius: r, background: "rgba(255,255,255,0.08)", flexShrink: 0 }} />
-  );
-}
 
 const EXPLORERS = {
   mainnet: { ethereum: "https://etherscan.io/tx/", bsc: "https://bscscan.com/tx/", bitcoin: "https://blockstream.info/tx/", solana: "https://solscan.io/tx/" },
@@ -67,6 +63,8 @@ function TxDetailsModal({ tx, onClose }: { tx: ChainTx; onClose: () => void }) {
   const chain = inferNetwork(tx);
   const explorer = EXPLORERS[network]?.[chain] ?? "";
   const value = tx.amountUSD > 0.001 ? formatUSD(tx.amountUSD) : "Value unavailable";
+  const fromContact = findAddressBookContact(tx.from, chain);
+  const toContact = findAddressBookContact(tx.to, chain);
 
   if (typeof document === "undefined") return null;
 
@@ -89,8 +87,8 @@ function TxDetailsModal({ tx, onClose }: { tx: ChainTx; onClose: () => void }) {
       >
         <GlassCard elevated style={{ padding: 22 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 15, display: "flex", alignItems: "center", justifyContent: "center", background: tx.type === "receive" ? "rgba(120,220,90,0.08)" : "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.10)" }}>
-              <CryptoIcon symbol={tx.asset} image={tx.tokenImage} size={26} />
+            <div style={{ width: 48, height: 48, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <CryptoIcon symbol={tx.asset} image={tx.tokenImage} size={38} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 18, fontWeight: 600, color: "#fff", marginBottom: 4 }}>{tx.type === "receive" ? "Received" : "Sent"} {tx.asset}</div>
@@ -107,10 +105,11 @@ function TxDetailsModal({ tx, onClose }: { tx: ChainTx; onClose: () => void }) {
           <div style={{ fontSize: 13, color: "rgba(255,255,255,0.36)", marginBottom: 16 }}>{value}</div>
 
           <DetailRow label="Date" value={formatDate(tx.date)} />
-          <DetailRow label="From" value={short(tx.from)} mono copyValue={tx.from} />
-          <DetailRow label="To" value={short(tx.to)} mono copyValue={tx.to} />
+          <DetailRow label="From" value={fromContact ? `${fromContact.name} (${short(tx.from)})` : short(tx.from)} mono={!fromContact} copyValue={tx.from} />
+          <DetailRow label="To" value={toContact ? `${toContact.name} (${short(tx.to)})` : short(tx.to)} mono={!toContact} copyValue={tx.to} />
           {tx.tokenContract && <DetailRow label="Contract" value={short(tx.tokenContract)} mono copyValue={tx.tokenContract} />}
           <DetailRow label="Hash" value={short(tx.hash)} mono copyValue={tx.hash} />
+          <TransactionNotes hash={tx.hash} />
 
           {explorer && (
             <a href={`${explorer}${tx.hash}`} target="_blank" rel="noopener noreferrer" style={{ marginTop: 16, height: 42, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, textDecoration: "none", color: "#000", background: "#fff", fontSize: 13, fontWeight: 650 }}>
@@ -125,9 +124,10 @@ function TxDetailsModal({ tx, onClose }: { tx: ChainTx; onClose: () => void }) {
 }
 
 export function HistoryView() {
-  const { transactions, historyFilter, setFilter, loading } = useWalletStore();
+  const { transactions, historyFilter, setFilter, loadingState } = useWalletStore();
   const [selectedTx, setSelectedTx] = useState<ChainTx | null>(null);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const historyLoading = loadingState.transactions.status === "loading" || loadingState.transactions.status === "refreshing";
 
   const filtered = historyFilter === "all"
     ? transactions
@@ -163,15 +163,15 @@ export function HistoryView() {
           </span>
           <button
             onClick={() => refreshWalletData()}
-            disabled={loading}
-            style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 10, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", cursor: loading ? "default" : "pointer", color: "rgba(255,255,255,0.45)", fontSize: 12, fontFamily: "inherit", fontWeight: 500, transition: "all 0.15s" }}
-            onMouseEnter={(e) => { if (!loading) (e.currentTarget.style.background = "rgba(255,255,255,0.09)"); }}
+            disabled={historyLoading}
+            style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 10, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", cursor: historyLoading ? "default" : "pointer", color: "rgba(255,255,255,0.45)", fontSize: 12, fontFamily: "inherit", fontWeight: 500, transition: "all 0.15s" }}
+            onMouseEnter={(e) => { if (!historyLoading) (e.currentTarget.style.background = "rgba(255,255,255,0.09)"); }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
           >
-            <motion.div animate={loading ? { rotate: 360 } : { rotate: 0 }} transition={loading ? { duration: 1, repeat: Infinity, ease: "linear" } : {}}>
+            <motion.div animate={historyLoading ? { rotate: 360 } : { rotate: 0 }} transition={historyLoading ? { duration: 1, repeat: Infinity, ease: "linear" } : {}}>
               <Icons.swap size={12} color="rgba(255,255,255,0.45)" />
             </motion.div>
-            {loading ? "Loading…" : "Refresh"}
+            Refresh
           </button>
         </div>
       </div>
@@ -201,21 +201,11 @@ export function HistoryView() {
       </div>
 
       {/* Loading skeleton */}
-      {loading && transactions.length === 0 ? (
+      {historyLoading && transactions.length === 0 ? (
         <GlassCard elevated style={{ overflow: "hidden" }}>
           {[0,1,2,3].map((i) => (
             <div key={i}>
-              <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "15px 18px" }}>
-                <Bone w={40} h={40} r={13} />
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
-                  <Bone w={80}  h={13} />
-                  <Bone w={150} h={11} />
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
-                  <Bone w={90} h={13} />
-                  <Bone w={60} h={11} />
-                </div>
-              </div>
+              <SkeletonRow />
               {i < 3 && <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "0 18px" }} />}
             </div>
           ))}
@@ -252,13 +242,10 @@ export function HistoryView() {
                       style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "15px 18px", cursor: "pointer", border: "none", backgroundColor: "rgba(255,255,255,0)", fontFamily: "inherit", textAlign: "left" }}
                     >
                       <div style={{
-                        width: 40, height: 40, borderRadius: 13, flexShrink: 0,
+                        width: 42, height: 42, flexShrink: 0,
                         display: "flex", alignItems: "center", justifyContent: "center",
-                        background: tx.type === "receive" ? "rgba(120,220,90,0.07)" : "rgba(255,255,255,0.04)",
-                        border: "1px solid rgba(255,255,255,0.09)", borderTop: "1px solid rgba(255,255,255,0.17)",
-                        boxShadow: "0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.07)",
                       }}>
-                        <CryptoIcon symbol={tx.asset} image={tx.tokenImage} size={20} />
+                        <CryptoIcon symbol={tx.asset} image={tx.tokenImage} size={32} />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>

@@ -7,6 +7,7 @@ import { Icons }       from "@/components/ui/Icon";
 import { useWalletStore } from "@/lib/store";
 import { useToast }    from "@/components/ui/Toast";
 import { bitcoinAddressForNetwork } from "@/lib/bitcoin";
+import { AccountSelector } from "@/components/accounts/AccountSelector";
 
 const NETWORKS = [
   { id: "ethereum" as const, label: "Ethereum", symbol: "ETH"   },
@@ -38,12 +39,12 @@ function QRGrid({ seed, size = 168 }: { seed: string; size?: number }) {
 }
 
 export function ReceiveView() {
-  const { addresses, mnemonic, network: activeNetwork } = useWalletStore();
+  const { addresses, mnemonic, network: activeNetwork, activeAccountIndex, activeAddressIndexes } = useWalletStore();
   const toast = useToast();
   const [netIdx, setNetIdx] = useState(0);
   const network = NETWORKS[netIdx];
   const btcAddress = addresses
-    ? (mnemonic ? bitcoinAddressForNetwork(mnemonic, activeNetwork) : addresses.bitcoin)
+    ? (mnemonic ? bitcoinAddressForNetwork(mnemonic, activeNetwork, activeAccountIndex, activeAddressIndexes.bitcoin) : addresses.bitcoin)
     : "";
 
   const addressMap: Record<string, string> = {
@@ -78,6 +79,12 @@ export function ReceiveView() {
         <span style={LABEL}>Deposit</span>
         <div style={{ fontSize: 28, fontWeight: 300, letterSpacing: "-0.015em", color: "#fff" }}>Receive</div>
       </div>
+      {mnemonic && (
+        <div>
+          <span style={LABEL}>Receiving account</span>
+          <AccountSelector />
+        </div>
+      )}
 
       {/* Network selector */}
       <div style={{ display: "flex", padding: 3, borderRadius: 16, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>

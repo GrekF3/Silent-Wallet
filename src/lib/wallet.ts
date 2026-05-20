@@ -12,7 +12,47 @@ export type WalletAddresses = {
   solana:   string;
 };
 
-const BTC_PATH = "m/84'/0'/0'/0/0";
+export type WalletNetworkKey = keyof WalletAddresses;
+export type WalletAddressIndexes = Record<WalletNetworkKey, number>;
+
+function safeAccountIndex(accountIndex = 0) {
+  return Number.isInteger(accountIndex) && accountIndex >= 0 ? accountIndex : 0;
+}
+
+function safeAddressIndex(addressIndex = 0) {
+  return Number.isInteger(addressIndex) && addressIndex >= 0 ? addressIndex : 0;
+}
+
+function pathAccountIndex(accountIndex = 0, addressIndex = 0) {
+  const account = safeAccountIndex(accountIndex);
+  const address = safeAddressIndex(addressIndex);
+  if (address === 0) return account;
+  return 10_000 + account * 1_000 + address;
+}
+
+export const DEFAULT_ADDRESS_INDEXES: WalletAddressIndexes = {
+  ethereum: 0,
+  bsc: 0,
+  bitcoin: 0,
+  solana: 0,
+};
+
+export function normalizeAddressIndexes(value?: Partial<WalletAddressIndexes> | null): WalletAddressIndexes {
+  return {
+    ethereum: safeAddressIndex(value?.ethereum),
+    bsc: safeAddressIndex(value?.bsc),
+    bitcoin: safeAddressIndex(value?.bitcoin),
+    solana: safeAddressIndex(value?.solana),
+  };
+}
+
+export function evmDerivationPath(accountIndex = 0, addressIndex = 0) {
+  return `m/44'/60'/0'/0/${pathAccountIndex(accountIndex, addressIndex)}`;
+}
+
+export function bitcoinDerivationPath(accountIndex = 0, addressIndex = 0) {
+  return `m/84'/0'/${pathAccountIndex(accountIndex, addressIndex)}'/0/0`;
+}
 
 export function generateMnemonic(): string {
   return Wallet.createRandom().mnemonic!.phrase;
@@ -25,31 +65,42 @@ export function validateMnemonic(phrase: string): boolean {
   } catch { return false; }
 }
 
-export function deriveAddresses(mnemonic: string): WalletAddresses {
+export function deriveAddresses(mnemonic: string, accountIndex = 0, addressIndexes?: Partial<WalletAddressIndexes> | null): WalletAddresses {
   const phrase = mnemonic.trim();
+  const index = safeAccountIndex(accountIndex);
+  const slots = normalizeAddressIndexes(addressIndexes);
 
-  const ethWallet  = HDNodeWallet.fromPhrase(phrase, undefined, "m/44'/60'/0'/0/0");
+  const ethWallet  = HDNodeWallet.fromPhrase(phrase, undefined, evmDerivationPath(index, slots.ethereum));
   const ethAddress = ethWallet.address as `0x${string}`;
+  const bscWallet  = slots.bsc === slots.ethereum
+    ? ethWallet
+    : HDNodeWallet.fromPhrase(phrase, undefined, evmDerivationPath(index, slots.bsc));
+  const bscAddress = bscWallet.address as `0x${string}`;
 
   const seed   = bip39.mnemonicToSeedSync(phrase);
   const master = HDKey.fromMasterSeed(seed);
-  const btcKey = master.derive(BTC_PATH);
+  const btcKey = master.derive(bitcoinDerivationPath(index, slots.bitcoin));
   const btcAddr = p2wpkh(btcKey.publicKey!, btc.NETWORK).address!;
 
-  const { address: solAddr } = deriveSolanaKeypair(phrase);
+  const { address: solAddr } = deriveSolanaKeypair(phrase, index, slots.solana);
 
-  return { ethereum: ethAddress, bitcoin: btcAddr, bsc: ethAddress, solana: solAddr };
+  return { ethereum: ethAddress, bitcoin: btcAddr, bsc: bscAddress, solana: solAddr };
 }
 
-export function derivePrivateKey(mnemonic: string): Uint8Array {
-  const ethWallet = HDNodeWallet.fromPhrase(mnemonic.trim(), undefined, "m/44'/60'/0'/0/0");
+export function deriveNetworkAddress(mnemonic: string, network: WalletNetworkKey, accountIndex = 0, addressIndex = 0): string {
+  const addresses = deriveAddresses(mnemonic, accountIndex, { ...DEFAULT_ADDRESS_INDEXES, [network]: addressIndex });
+  return addresses[network];
+}
+
+export function derivePrivateKey(mnemonic: string, accountIndex = 0, addressIndex = 0): Uint8Array {
+  const ethWallet = HDNodeWallet.fromPhrase(mnemonic.trim(), undefined, evmDerivationPath(accountIndex, addressIndex));
   return Buffer.from(ethWallet.privateKey.slice(2), "hex");
 }
 
-export function deriveBitcoinKeypair(mnemonic: string): { privateKey: Uint8Array; publicKey: Uint8Array; address: string } {
+export function deriveBitcoinKeypair(mnemonic: string, accountIndex = 0, addressIndex = 0): { privateKey: Uint8Array; publicKey: Uint8Array; address: string } {
   const seed = bip39.mnemonicToSeedSync(mnemonic.trim());
   const master = HDKey.fromMasterSeed(seed);
-  const key = master.derive(BTC_PATH);
+  const key = master.derive(bitcoinDerivationPath(accountIndex, addressIndex));
   const privateKey = key.privateKey;
   const publicKey = key.publicKey;
   if (!privateKey || !publicKey) throw new Error("Failed to derive Bitcoin key");

@@ -13,14 +13,15 @@ type NavItem = {
 const NAV: NavItem[] = [
   { id: "dashboard", label: "Home",     icon: "grid"     },
   { id: "ecosystem", label: "Web3",     icon: "globe"    },
+  { id: "accounts",  label: "Accounts", icon: "wallet"   },
   { id: "transfer",  label: "Transfer", icon: "swap"     },
-  { id: "history",   label: "History",  icon: "clock"    },
+  { id: "premium",   label: "Pro",      icon: "lock"     },
   { id: "settings",  label: "Settings", icon: "settings" },
 ];
 
 export function BottomNav() {
   const { view, setView, sessionMode } = useWalletStore();
-  const activeNav = (view === "asset" ? "dashboard" : view) as View;
+  const activeNav = (view === "asset" ? "dashboard" : view === "addressBook" ? "accounts" : view === "learn" ? "ecosystem" : view) as View;
   const items = sessionMode === "watch" ? NAV.filter((item) => item.id !== "transfer") : NAV;
 
   return (

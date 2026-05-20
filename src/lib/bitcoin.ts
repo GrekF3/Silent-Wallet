@@ -41,17 +41,21 @@ async function feeRate(net: Network): Promise<number> {
   }
 }
 
-export function bitcoinAddressForNetwork(mnemonic: string, net: Network): string {
-  const key = deriveBitcoinKeypair(mnemonic);
+export function bitcoinAddressForNetwork(mnemonic: string, net: Network, accountIndex = 0, addressIndex = 0): string {
+  const key = deriveBitcoinKeypair(mnemonic, accountIndex, addressIndex);
   const btcNetworks = btc as unknown as { NETWORK: unknown; TEST_NETWORK?: unknown };
   const network = net === "testnet" ? (btcNetworks.TEST_NETWORK ?? btcNetworks.NETWORK) : btcNetworks.NETWORK;
   const payment = (btc.p2wpkh as unknown as (pubkey: Uint8Array, network: unknown) => { address?: string })(key.publicKey, network);
   return payment.address ?? key.address;
 }
 
-export async function sendBtc(params: { mnemonic: string; to: string; amount: string; net: Network }): Promise<string> {
-  const key = deriveBitcoinKeypair(params.mnemonic);
-  const utxos = (await fetchUtxos(key.address, params.net)).sort((a, b) => b.value - a.value);
+export async function sendBtc(params: { mnemonic: string; to: string; amount: string; net: Network; accountIndex?: number; addressIndex?: number }): Promise<string> {
+  const key = deriveBitcoinKeypair(params.mnemonic, params.accountIndex ?? 0, params.addressIndex ?? 0);
+  const btcNetworks = btc as unknown as { NETWORK: unknown; TEST_NETWORK?: unknown };
+  const network = params.net === "testnet" ? (btcNetworks.TEST_NETWORK ?? btcNetworks.NETWORK) : btcNetworks.NETWORK;
+  const payment = (btc.p2wpkh as unknown as (pubkey: Uint8Array, network: unknown) => { script: Uint8Array; address?: string })(key.publicKey, network);
+  const signingAddress = payment.address ?? key.address;
+  const utxos = (await fetchUtxos(signingAddress, params.net)).sort((a, b) => b.value - a.value);
   const target = satsFromBtc(params.amount);
   if (target <= 0n) throw new Error("Amount must be greater than zero");
 
@@ -69,11 +73,8 @@ export async function sendBtc(params: { mnemonic: string; to: string; amount: st
   const change = inputTotal - target - fee;
   if (change < 0n) throw new Error("Insufficient BTC balance for amount and network fee");
 
-  const btcNetworks = btc as unknown as { NETWORK: unknown; TEST_NETWORK?: unknown };
-  const network = params.net === "testnet" ? (btcNetworks.TEST_NETWORK ?? btcNetworks.NETWORK) : btcNetworks.NETWORK;
-  const payment = (btc.p2wpkh as unknown as (pubkey: Uint8Array, network: unknown) => { script: Uint8Array; address?: string })(key.publicKey, network);
   if (!payment.script) throw new Error("Failed to build Bitcoin witness script");
-  const changeAddress = payment.address ?? key.address;
+  const changeAddress = signingAddress;
   const Tx = (btc as unknown as { Transaction: new () => unknown }).Transaction;
   const tx = new Tx() as {
     addInput: (input: unknown) => void;

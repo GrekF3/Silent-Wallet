@@ -17,7 +17,6 @@ type Notice =
   | {
       kind: "updated";
       currentVersion: string;
-      previousVersion: string;
       bodyLines: string[];
     };
 
@@ -87,7 +86,6 @@ export function AppUpdateNotice() {
           setNotice({
             kind: "updated",
             currentVersion,
-            previousVersion,
             bodyLines: parseReleaseNotes(undefined, currentVersion),
           });
         }
@@ -129,6 +127,10 @@ export function AppUpdateNotice() {
     setNotice(null);
     setDownloadState({ status: "idle" });
   }, [notice]);
+
+  const openChangelog = useCallback(() => {
+    window.open(DEFAULT_UPDATE_DOWNLOAD_URL, "_blank", "noopener,noreferrer");
+  }, []);
 
   const startDownload = useCallback(async () => {
     if (!notice || notice.kind !== "available") return;
@@ -185,9 +187,6 @@ export function AppUpdateNotice() {
             }}
           >
             <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-              <span style={{ width: 34, height: 34, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.70)", flexShrink: 0 }}>
-                {notice.kind === "available" ? <Icons.download size={16} /> : <Icons.check size={16} />}
-              </span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>
@@ -200,12 +199,12 @@ export function AppUpdateNotice() {
                 <div style={{ marginTop: 3, fontSize: 12, color: "rgba(255,255,255,0.36)" }}>
                   {notice.kind === "available"
                     ? `You are running ${notice.currentVersion}. A newer signed build is available.`
-                    : `Previous version: ${notice.previousVersion}`}
+                    : "Update completed successfully."}
                 </div>
               </div>
             </div>
 
-            {notice.bodyLines.length > 0 && (
+            {notice.kind === "available" && notice.bodyLines.length > 0 && (
               <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
                 {notice.bodyLines.map((line, index) => (
                   <div key={line} style={{ display: "flex", gap: 8, fontSize: 12, lineHeight: 1.45, color: "rgba(255,255,255,0.58)" }}>
@@ -213,6 +212,14 @@ export function AppUpdateNotice() {
                     <span>{line}</span>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {notice.kind === "updated" && (
+              <div style={{ marginTop: 14, display: "flex", justifyContent: "flex-end" }}>
+                <button type="button" onClick={openChangelog} style={smallButton}>
+                  View changelog
+                </button>
               </div>
             )}
 

@@ -11,7 +11,10 @@ import { TransferView } from "@/components/wallet/TransferView";
 import { HistoryView }  from "@/components/wallet/HistoryView";
 import { SettingsView } from "@/components/wallet/SettingsView";
 import { EcosystemView } from "@/components/wallet/ecosystem/EcosystemView";
-import { AppPreloader } from "@/components/ui/AppPreloader";
+import { LearnCenter } from "@/components/learn/LearnCenter";
+import { PremiumView } from "@/components/premium/PremiumView";
+import { AccountsView } from "@/components/accounts/AccountsView";
+import { AddressBookView } from "@/components/addressBook/AddressBookView";
 import { useChainData } from "@/lib/useChainData";
 
 const PAGE: Variants = {
@@ -21,7 +24,7 @@ const PAGE: Variants = {
 };
 
 export function AppShell({ onLock }: { onLock: () => void }) {
-  const { view, addresses, initialLoaded, sessionMode } = useWalletStore();
+  const { view, sessionMode } = useWalletStore();
   useChainData();
   useActivityTracker(onLock);
 
@@ -33,12 +36,16 @@ export function AppShell({ onLock }: { onLock: () => void }) {
       case "history":   return <HistoryView />;
       case "settings":  return <SettingsView />;
       case "ecosystem": return <EcosystemView />;
+      case "learn": return <LearnCenter />;
+      case "premium": return <PremiumView />;
+      case "accounts": return <AccountsView />;
+      case "addressBook": return <AddressBookView />;
     }
   };
 
   return (
     <ToastProvider>
-      <div className="app-shell" style={{ display:"flex", flexDirection:"column", height:"100vh", width:"100vw", overflow:"hidden", background:"#080808", position:"relative" }}>
+      <div className="app-shell" style={{ display:"flex", flexDirection:"column", height:"100vh", width:"100vw", overflow:"hidden", background:"var(--bg)", position:"relative" }}>
 
         {/* Atmosphere */}
         <div aria-hidden style={{ position:"fixed", inset:0, zIndex:0, pointerEvents:"none",
@@ -70,9 +77,6 @@ export function AppShell({ onLock }: { onLock: () => void }) {
           </AnimatePresence>
         </main>
         <BottomNav />
-        <AnimatePresence>
-          {addresses && !initialLoaded && <AppPreloader label="Syncing wallet" />}
-        </AnimatePresence>
       </div>
     </ToastProvider>
   );
