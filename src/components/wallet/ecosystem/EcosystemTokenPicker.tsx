@@ -58,7 +58,7 @@ export function EcosystemTokenPicker({
           fontFamily: "inherit",
         }}
       >
-        <CryptoIcon symbol={selected.symbol} image={selected.logoURI} size={24} />
+        <CryptoIcon symbol={selected.symbol} image={selected.logoURI} size={34} />
         <span style={{ minWidth: 0, flex: 1, textAlign: "left" }}>
           <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
             <span style={{ fontSize: 14, fontWeight: 700 }}>{selected.symbol}</span>
@@ -109,7 +109,7 @@ export function EcosystemTokenPicker({
                   onClick={() => { onSelect(token); setOpen(false); }}
                   style={{ width: "100%", display: "flex", alignItems: "center", gap: 11, padding: "10px 11px", borderRadius: 12, border: 0, background: token.id === selected.id ? "rgba(255,255,255,0.08)" : "transparent", color: "#fff", fontFamily: "inherit", cursor: "pointer", textAlign: "left" }}
                 >
-                  <CryptoIcon symbol={token.symbol} image={token.logoURI} size={22} />
+                  <CryptoIcon symbol={token.symbol} image={token.logoURI} size={30} />
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <span style={{ fontSize: 13, fontWeight: 650 }}>{token.symbol}</span>

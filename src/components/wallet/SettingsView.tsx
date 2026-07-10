@@ -7,6 +7,9 @@ import { Icons }       from "@/components/ui/Icon";
 import { useWalletStore } from "@/lib/store";
 import { useToast } from "@/components/ui/Toast";
 import { deleteWallet } from "@/lib/storage";
+import { PrivacyPanel } from "@/components/privacy/PrivacyPanel";
+import { ExportPanel } from "@/components/exports/ExportPanel";
+import { PremiumBadge } from "@/components/premium/PremiumBadge";
 
 const T = {
   label: { fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "rgba(255,255,255,0.28)", marginBottom: 10, display: "block" } as React.CSSProperties,
@@ -134,12 +137,101 @@ function ResetModal({ onConfirm, onClose }: { onConfirm: () => void; onClose: ()
   );
 }
 
+type SettingsSection = "privacy" | "exports" | "security" | null;
+
+function SettingsRow({
+  icon,
+  title,
+  body,
+  onClick,
+  right,
+  danger = false,
+}: {
+  icon: keyof typeof Icons;
+  title: string;
+  body?: string;
+  onClick?: () => void;
+  right?: React.ReactNode;
+  danger?: boolean;
+}) {
+  const Icon = Icons[icon];
+  const content = (
+    <>
+      <div style={{ width: 32, height: 32, borderRadius: 10, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: danger ? "rgba(255,60,60,0.07)" : "rgba(255,255,255,0.05)", border: `1px solid ${danger ? "rgba(255,80,80,0.18)" : "rgba(255,255,255,0.09)"}`, borderTop: `1px solid ${danger ? "rgba(255,80,80,0.28)" : "rgba(255,255,255,0.16)"}` }}>
+        <Icon size={14} color={danger ? "rgba(255,100,100,0.70)" : "rgba(255,255,255,0.40)"} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: danger ? "rgba(255,90,90,0.82)" : "rgba(255,255,255,0.85)" }}>{title}</div>
+        {body && <div style={{ fontSize: 11, color: danger ? "rgba(255,100,100,0.40)" : "rgba(255,255,255,0.28)", marginTop: 2, lineHeight: 1.45 }}>{body}</div>}
+      </div>
+      {right ?? (onClick ? <Icons.chevronR size={14} color={danger ? "rgba(255,100,100,0.25)" : "rgba(255,255,255,0.22)"} /> : null)}
+    </>
+  );
+  const rowStyle: React.CSSProperties = { width: "100%", display: "flex", alignItems: "center", gap: 13, padding: "14px 18px", cursor: onClick ? "pointer" : "default", border: 0, borderBottom: "1px solid rgba(255,255,255,0.05)", background: "transparent", font: "inherit", textAlign: "left" };
+
+  if (!onClick) {
+    return (
+      <motion.div style={rowStyle}>
+        {content}
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.button
+      type="button"
+      whileHover={{ backgroundColor: danger ? "rgba(255,60,60,0.04)" : "rgba(255,255,255,0.025)" }}
+      onClick={onClick}
+      style={rowStyle}
+    >
+      {content}
+    </motion.button>
+  );
+}
+
+function SectionCard({ children }: { children: React.ReactNode }) {
+  return (
+    <GlassCard elevated style={{ overflow: "hidden", borderRadius: 22 }}>
+      {children}
+    </GlassCard>
+  );
+}
+
+function SecurityPanel({
+  watchOnly,
+  onShowPhrase,
+  onShowReset,
+}: {
+  watchOnly: boolean;
+  onShowPhrase: () => void;
+  onShowReset: () => void;
+}) {
+  if (watchOnly) {
+    return (
+      <GlassCard elevated style={{ padding: 18, borderRadius: 22 }}>
+        <div style={{ fontSize: 16, fontWeight: 650, color: "#fff" }}>Observer mode</div>
+        <div style={{ marginTop: 4, fontSize: 12, color: "rgba(255,255,255,0.32)", lineHeight: 1.5 }}>
+          This session can view public activity, but it cannot sign transactions.
+        </div>
+      </GlassCard>
+    );
+  }
+
+  return (
+    <SectionCard>
+      <SettingsRow icon="key" title="Export Secret Phrase" body="View your 12-word recovery phrase." onClick={onShowPhrase} />
+      <SettingsRow icon="shield" title="Reset Wallet" body="Delete wallet from this device." onClick={onShowReset} danger />
+    </SectionCard>
+  );
+}
+
 export function SettingsView() {
-  const { mnemonic, clearSession, network, setNetwork, sessionMode, hideZeroBalances, setHideZeroBalances } = useWalletStore();
+  const { mnemonic, clearSession, network, setNetwork, sessionMode, hideZeroBalances, setHideZeroBalances, setView } = useWalletStore();
   const watchOnly = sessionMode === "watch";
 
   const [showPhrase, setShowPhrase] = useState(false);
   const [showReset,  setShowReset]  = useState(false);
+  const [section, setSection] = useState<SettingsSection>(null);
 
   const handleReset = async () => {
     await deleteWallet();
@@ -159,23 +251,24 @@ export function SettingsView() {
       <motion.div
         className="view-shell"
         initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }}
-        style={{ padding: "36px 28px", display: "flex", flexDirection: "column", gap: 24, maxWidth: 560 }}
+        style={{ padding: "36px 28px", display: "flex", flexDirection: "column", gap: 18, maxWidth: 560 }}
       >
-        {/* Header */}
         <div>
           <span style={T.label}>Account</span>
-          <div style={{ fontSize: 28, fontWeight: 300, letterSpacing: "-0.015em", color: "#fff" }}>Settings</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ fontSize: 28, fontWeight: 300, letterSpacing: "-0.015em", color: "#fff" }}>Settings</div>
+            <PremiumBadge />
+          </div>
         </div>
 
-        {/* Network */}
         <div>
-          <span style={T.label}>Network</span>
-          <GlassCard elevated style={{ overflow: "hidden" }}>
-            <div style={{ display: "flex", alignItems: "center", padding: "14px 18px", gap: 13 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 10, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", borderTop: "1px solid rgba(255,255,255,0.16)" }}>
-                <Icons.globe size={14} color="rgba(255,255,255,0.40)" />
-              </div>
-              <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: "rgba(255,255,255,0.85)" }}>Active network</span>
+          <span style={T.label}>Basics</span>
+          <SectionCard>
+            <SettingsRow
+              icon="globe"
+              title="Active network"
+              body={network === "mainnet" ? "Mainnet assets and activity." : "Testnet mode for safe testing."}
+              right={(
               <div style={{ display: "flex", gap: 4, padding: 3, borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
                 {(["mainnet", "testnet"] as const).map((n) => (
                   <button key={n} onClick={() => setNetwork(n)} style={{ padding: "5px 12px", borderRadius: 7, border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 500, background: network === n ? "rgba(255,255,255,0.10)" : "transparent", color: network === n ? "#fff" : "rgba(255,255,255,0.32)", transition: "all 0.15s" }}>
@@ -183,67 +276,43 @@ export function SettingsView() {
                   </button>
                 ))}
               </div>
-            </div>
-          </GlassCard>
+              )}
+            />
+            <SettingsRow icon="eye" title="Hide zero balances" body="Keep asset lists compact." right={<Toggle on={hideZeroBalances} onChange={() => setHideZeroBalances(!hideZeroBalances)} />} />
+          </SectionCard>
         </div>
 
-        {/* Preferences */}
         <div>
-          <span style={T.label}>Preferences</span>
-          <GlassCard elevated style={{ overflow: "hidden" }}>
-            <div style={{ display: "flex", alignItems: "center", padding: "14px 18px", gap: 13 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 10, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", borderTop: "1px solid rgba(255,255,255,0.16)" }}>
-                <Icons.eye size={14} color="rgba(255,255,255,0.40)" />
-              </div>
-              <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: "rgba(255,255,255,0.85)" }}>Hide zero balances</span>
-              <Toggle on={hideZeroBalances} onChange={() => setHideZeroBalances(!hideZeroBalances)} />
-            </div>
-          </GlassCard>
+          <span style={T.label}>Wallet</span>
+          <SectionCard>
+            {[
+              { view: "accounts" as const, icon: "wallet" as const, title: "Accounts", body: "Accounts, addresses, and separation." },
+              { view: "addressBook" as const, icon: "key" as const, title: "Address Book", body: "Local recipient labels." },
+              { view: "learn" as const, icon: "help" as const, title: "Academy", body: "Short Web3 explanations." },
+              { view: "premium" as const, icon: "lock" as const, title: "Silent Pro", body: "Advanced custody operations." },
+            ].map((item) => <SettingsRow key={item.view} icon={item.icon} title={item.title} body={item.body} onClick={() => setView(item.view)} />)}
+          </SectionCard>
         </div>
 
-        {/* Security */}
-        {!watchOnly && (
         <div>
-          <span style={T.label}>Security</span>
-          <GlassCard elevated style={{ overflow: "hidden" }}>
-            {/* Export phrase */}
-            <motion.div
-              whileHover={{ backgroundColor: "rgba(255,255,255,0.025)" }}
-              onClick={() => setShowPhrase(true)}
-              style={{ display: "flex", alignItems: "center", gap: 13, padding: "14px 18px", cursor: "pointer" }}
-            >
-              <div style={{ width: 32, height: 32, borderRadius: 10, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", borderTop: "1px solid rgba(255,255,255,0.16)" }}>
-                <Icons.key size={14} color="rgba(255,255,255,0.40)" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 500, color: "rgba(255,255,255,0.85)" }}>Export Secret Phrase</div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.28)", marginTop: 2 }}>View your 12-word recovery phrase</div>
-              </div>
-              <Icons.chevronR size={14} color="rgba(255,255,255,0.22)" />
-            </motion.div>
-
-            <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "0 18px" }} />
-
-            {/* Reset wallet */}
-            <motion.div
-              whileHover={{ backgroundColor: "rgba(255,60,60,0.04)" }}
-              onClick={() => setShowReset(true)}
-              style={{ display: "flex", alignItems: "center", gap: 13, padding: "14px 18px", cursor: "pointer" }}
-            >
-              <div style={{ width: 32, height: 32, borderRadius: 10, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,60,60,0.07)", border: "1px solid rgba(255,80,80,0.18)", borderTop: "1px solid rgba(255,80,80,0.28)" }}>
-                <Icons.shield size={14} color="rgba(255,100,100,0.70)" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 500, color: "rgba(255,90,90,0.80)" }}>Reset Wallet</div>
-                <div style={{ fontSize: 11, color: "rgba(255,100,100,0.40)", marginTop: 2 }}>Delete wallet from this device</div>
-              </div>
-              <Icons.chevronR size={14} color="rgba(255,100,100,0.25)" />
-            </motion.div>
-          </GlassCard>
+          <span style={T.label}>Tools</span>
+          <SectionCard>
+            <SettingsRow icon="eyeOff" title="Privacy controls" body="Screen privacy, helper mode, and provider notices." onClick={() => setSection(section === "privacy" ? null : "privacy")} />
+            <SettingsRow icon="download" title="Exports" body="CSV exports for accounts, contacts, history, and portfolio." onClick={() => setSection(section === "exports" ? null : "exports")} />
+            <SettingsRow icon="shield" title={watchOnly ? "Observer security" : "Recovery and reset"} body={watchOnly ? "Signing is disabled in observer mode." : "Secret phrase and device reset."} onClick={() => setSection(section === "security" ? null : "security")} />
+          </SectionCard>
         </div>
-        )}
 
-        {/* Lock button */}
+        <AnimatePresence mode="wait">
+          {section && (
+            <motion.div key={section} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.16 }}>
+              {section === "privacy" && <PrivacyPanel />}
+              {section === "exports" && <ExportPanel />}
+              {section === "security" && <SecurityPanel watchOnly={watchOnly} onShowPhrase={() => setShowPhrase(true)} onShowReset={() => setShowReset(true)} />}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <motion.button
           whileHover={{ backgroundColor: "rgba(255,255,255,0.06)" }}
           whileTap={{ scale: 0.98 }}

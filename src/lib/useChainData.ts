@@ -10,11 +10,12 @@ import { fetchAllEvmTokens } from "./tokens";
 import { fetchWalletHistory } from "./history";
 import { readCacheAny, writeCache } from "./cache";
 import { setWalletRefreshHandler } from "./walletRefresh";
+import type { WalletAddresses } from "./wallet";
 
 const FETCH_TIMEOUT = 12_000;
 const EMPTY_EVM = "0x0000000000000000000000000000000000000000";
 
-let activeRefresh = false;
+let activeRefreshKey = "";
 let hydratedCacheKey = "";
 
 type LoadResult<T> =
@@ -81,23 +82,96 @@ function validSol(address: string | undefined) {
   return !!address && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address);
 }
 
-function cacheAddress(addresses: { ethereum: string; bitcoin: string; solana: string }, mode: string) {
-  const address = validEvm(addresses.ethereum) ? addresses.ethereum : (addresses.bitcoin || addresses.solana || addresses.ethereum);
-  return `${mode}:${address}`;
+function cacheAddress(addresses: WalletAddresses, mode: string) {
+  return [
+    mode,
+    addresses.ethereum || EMPTY_EVM,
+    addresses.bsc || EMPTY_EVM,
+    addresses.bitcoin || "",
+    addresses.solana || "",
+  ].join(":");
+}
+
+function pricesFromAssets(assets: AssetInfo[]): Prices {
+  const prices = emptyPrices();
+  for (const asset of assets) {
+    if (!asset.symbol || asset.priceUSD <= 0) continue;
+    const current = prices[asset.symbol] ?? {
+      usd: 0,
+      usd_24h_change: 0,
+      usd_7d_change: 0,
+      image: "",
+      spark7d: [],
+      spark7dTimestamps: [],
+    };
+    prices[asset.symbol] = {
+      ...current,
+      usd: asset.priceUSD,
+      usd_24h_change: asset.change24h,
+      usd_7d_change: asset.change7d,
+      image: asset.image || current.image,
+      spark7d: asset.spark7d?.length ? asset.spark7d : current.spark7d,
+      spark7dTimestamps: asset.spark7dTimestamps?.length ? asset.spark7dTimestamps : current.spark7dTimestamps,
+    };
+  }
+  return prices;
+}
+
+function usablePrices(prices: Prices | null, previousAssets: AssetInfo[]) {
+  return mergePrices(prices, previousAssets.length ? pricesFromAssets(previousAssets) : null);
+}
+
+function nativePrice(prices: Prices, previousAssets: AssetInfo[], symbol: keyof ReturnType<typeof emptyPrices>, id: string) {
+  const price = prices[symbol]?.usd ?? 0;
+  if (price > 0) return price;
+  return previousAssets.find((asset) => asset.id === id)?.priceUSD ?? 0;
+}
+
+function buildNativeAssets(
+  balances: { eth: number; btc: number; bnb: number; sol: number },
+  prices: Prices,
+  previousAssets: AssetInfo[],
+): AssetInfo[] {
+  const ethPrice = nativePrice(prices, previousAssets, "ETH", "eth");
+  const btcPrice = nativePrice(prices, previousAssets, "BTC", "btc");
+  const bnbPrice = nativePrice(prices, previousAssets, "BNB", "bnb");
+  const solPrice = nativePrice(prices, previousAssets, "SOL", "sol");
+
+  return [
+    { id: "eth", symbol: "ETH", name: "Ethereum", network: "ethereum", balance: balances.eth, priceUSD: ethPrice, change24h: prices.ETH?.usd_24h_change ?? 0, change7d: prices.ETH?.usd_7d_change ?? 0, spark7d: prices.ETH?.spark7d ?? [], spark7dTimestamps: prices.ETH?.spark7dTimestamps ?? [], image: prices.ETH?.image ?? "", desc: "Smart contract platform" },
+    { id: "btc", symbol: "BTC", name: "Bitcoin",  network: "bitcoin",  balance: balances.btc, priceUSD: btcPrice, change24h: prices.BTC?.usd_24h_change ?? 0, change7d: prices.BTC?.usd_7d_change ?? 0, spark7d: prices.BTC?.spark7d ?? [], spark7dTimestamps: prices.BTC?.spark7dTimestamps ?? [], image: prices.BTC?.image ?? "", desc: "Original decentralised currency" },
+    { id: "bnb", symbol: "BNB", name: "BNB",      network: "bsc",      balance: balances.bnb, priceUSD: bnbPrice, change24h: prices.BNB?.usd_24h_change ?? 0, change7d: prices.BNB?.usd_7d_change ?? 0, spark7d: prices.BNB?.spark7d ?? [], spark7dTimestamps: prices.BNB?.spark7dTimestamps ?? [], image: prices.BNB?.image ?? "", desc: "BNB Chain native token" },
+    { id: "sol", symbol: "SOL", name: "Solana",   network: "solana",   balance: balances.sol, priceUSD: solPrice, change24h: prices.SOL?.usd_24h_change ?? 0, change7d: prices.SOL?.usd_7d_change ?? 0, spark7d: prices.SOL?.spark7d ?? [], spark7dTimestamps: prices.SOL?.spark7dTimestamps ?? [], image: prices.SOL?.image ?? "", desc: "High-performance L1" },
+  ];
+}
+
+function filterWatchAssets(assets: AssetInfo[], available: { hasEth: boolean; hasBsc: boolean; hasBtc: boolean; hasSol: boolean }, sessionMode: string) {
+  if (sessionMode !== "watch") return assets;
+  return assets.filter((asset) =>
+    (asset.network === "ethereum" && available.hasEth) ||
+    (asset.network === "bsc" && available.hasBsc) ||
+    (asset.network === "bitcoin" && available.hasBtc) ||
+    (asset.network === "solana" && available.hasSol)
+  );
 }
 
 export function useChainData() {
   const {
-    addresses, network, mnemonic, sessionMode,
+    addresses, network, mnemonic, sessionMode, activeAccountIndex, activeAddressIndexes,
     setAssets, setTokens, setTxs, setPrices,
     setLoading, setInitialLoaded, setSourceState, markUpdated,
   } = useWalletStore();
 
   const refresh = useCallback(async (silent = false) => {
     if (!addresses) return;
-    if (activeRefresh) return;
+    const requestKey = `${network}:${sessionMode}:${activeAccountIndex}:${cacheAddress(addresses, sessionMode).toLowerCase()}`;
+    if (activeRefreshKey === requestKey) return;
+    const isCurrentRequest = () => {
+      const state = useWalletStore.getState();
+      return state.addresses === addresses && state.network === network && state.activeAccountIndex === activeAccountIndex && state.sessionMode === sessionMode;
+    };
 
-    activeRefresh = true;
+    activeRefreshKey = requestKey;
     if (!silent) setLoading(true);
 
     const sourceStatus = silent ? "refreshing" : "loading";
@@ -105,22 +179,13 @@ export function useChainData() {
     setSourceState("balances", { status: sourceStatus, error: undefined });
 
     try {
-      const priceResult = await loadWithTimeout(fetchPrices(), FETCH_TIMEOUT);
-      const existingSnap = useWalletStore.getState();
-      const prices = mergePrices(priceResult.ok ? priceResult.value : null, existingSnap.prices);
-
-      setPrices(prices);
-      setSourceState("prices", {
-        status: priceResult.ok ? "ready" : (existingSnap.prices ? "partial" : "error"),
-        error: priceResult.ok ? undefined : priceResult.error,
-        updatedAt: Date.now(),
-      });
-
-      const bitcoinAddress = mnemonic ? bitcoinAddressForNetwork(mnemonic, network) : addresses.bitcoin;
+      const bitcoinAddress = mnemonic ? bitcoinAddressForNetwork(mnemonic, network, activeAccountIndex, activeAddressIndexes.bitcoin) : addresses.bitcoin;
       const hasEth = validEvm(addresses.ethereum);
       const hasBsc = validEvm(addresses.bsc);
       const hasBtc = validBtc(bitcoinAddress);
       const hasSol = validSol(addresses.solana);
+      const available = { hasEth, hasBsc, hasBtc, hasSol };
+      const priceRequest = loadWithTimeout(fetchPrices(), FETCH_TIMEOUT);
       const [ethBal, bnbBal, btcBal, solBal] = await Promise.all([
         hasEth ? loadWithTimeout(getEthBalance(addresses.ethereum, network), FETCH_TIMEOUT) : skipped(0),
         hasBsc ? loadWithTimeout(getBnbBalance(addresses.bsc, network), FETCH_TIMEOUT) : skipped(0),
@@ -128,35 +193,53 @@ export function useChainData() {
         hasSol ? loadWithTimeout(getSolBalance(addresses.solana, network), FETCH_TIMEOUT) : skipped(0),
       ]);
 
-      const prevAssets = useWalletStore.getState().assets;
+      if (!isCurrentRequest()) return;
+      const balanceSnap = useWalletStore.getState();
+      const prevAssets = balanceSnap.assets;
       const safeBal = (fresh: LoadResult<number>, id: string) =>
         fresh.ok ? fresh.value : (prevAssets.find((a) => a.id === id)?.balance ?? 0);
+      const balances = {
+        eth: safeBal(ethBal, "eth"),
+        btc: safeBal(btcBal, "btc"),
+        bnb: safeBal(bnbBal, "bnb"),
+        sol: safeBal(solBal, "sol"),
+      };
+      const provisionalPrices = usablePrices(balanceSnap.prices, prevAssets);
+      const provisionalAssets = filterWatchAssets(buildNativeAssets(balances, provisionalPrices, prevAssets), available, sessionMode);
 
-      const allNativeAssets: AssetInfo[] = [
-        { id: "eth", symbol: "ETH", name: "Ethereum", network: "ethereum", balance: safeBal(ethBal, "eth"), priceUSD: prices.ETH?.usd ?? 0, change24h: prices.ETH?.usd_24h_change ?? 0, change7d: prices.ETH?.usd_7d_change ?? 0, spark7d: prices.ETH?.spark7d ?? [], spark7dTimestamps: prices.ETH?.spark7dTimestamps ?? [], image: prices.ETH?.image ?? "", desc: "Smart contract platform" },
-        { id: "btc", symbol: "BTC", name: "Bitcoin",  network: "bitcoin",  balance: safeBal(btcBal, "btc"), priceUSD: prices.BTC?.usd ?? 0, change24h: prices.BTC?.usd_24h_change ?? 0, change7d: prices.BTC?.usd_7d_change ?? 0, spark7d: prices.BTC?.spark7d ?? [], spark7dTimestamps: prices.BTC?.spark7dTimestamps ?? [], image: prices.BTC?.image ?? "", desc: "Original decentralised currency" },
-        { id: "bnb", symbol: "BNB", name: "BNB",      network: "bsc",      balance: safeBal(bnbBal, "bnb"), priceUSD: prices.BNB?.usd ?? 0, change24h: prices.BNB?.usd_24h_change ?? 0, change7d: prices.BNB?.usd_7d_change ?? 0, spark7d: prices.BNB?.spark7d ?? [], spark7dTimestamps: prices.BNB?.spark7dTimestamps ?? [], image: prices.BNB?.image ?? "", desc: "BNB Chain native token" },
-        { id: "sol", symbol: "SOL", name: "Solana",   network: "solana",   balance: safeBal(solBal, "sol"), priceUSD: prices.SOL?.usd ?? 0, change24h: prices.SOL?.usd_24h_change ?? 0, change7d: prices.SOL?.usd_7d_change ?? 0, spark7d: prices.SOL?.spark7d ?? [], spark7dTimestamps: prices.SOL?.spark7dTimestamps ?? [], image: prices.SOL?.image ?? "", desc: "High-performance L1" },
-      ];
-      const assets = sessionMode === "watch"
-        ? allNativeAssets.filter((asset) =>
-          (asset.network === "ethereum" && hasEth) ||
-          (asset.network === "bsc" && hasBsc) ||
-          (asset.network === "bitcoin" && hasBtc) ||
-          (asset.network === "solana" && hasSol)
-        )
-        : allNativeAssets;
-
-      setAssets(assets);
+      setAssets(provisionalAssets);
+      setInitialLoaded(true);
+      setLoading(false);
       const balanceFailures = [ethBal, bnbBal, btcBal, solBal].filter((res) => !res.ok);
       setSourceState("balances", {
         status: balanceFailures.length ? "partial" : "ready",
         error: balanceFailures.map((res) => !res.ok ? res.error : "").filter(Boolean).join("; ") || undefined,
         updatedAt: Date.now(),
       });
+      writeCache(cacheAddress(addresses, sessionMode), network, {
+        assets: provisionalAssets,
+        transactions: balanceSnap.transactions,
+        evmTokens: balanceSnap.evmTokens,
+        splTokens: balanceSnap.splTokens,
+        prices: balanceSnap.prices ?? pricesFromAssets(provisionalAssets),
+      });
+
+      const priceResult = await priceRequest;
+      if (!isCurrentRequest()) return;
+      const pricedSnap = useWalletStore.getState();
+      const prices = mergePrices(priceResult.ok ? priceResult.value : null, pricedSnap.prices ?? pricesFromAssets(pricedSnap.assets));
+      setPrices(prices);
+      setSourceState("prices", {
+        status: priceResult.ok ? "ready" : (pricedSnap.prices || pricedSnap.assets.some((asset) => asset.priceUSD > 0) ? "partial" : "error"),
+        error: priceResult.ok ? undefined : priceResult.error,
+        updatedAt: Date.now(),
+      });
+      const assets = filterWatchAssets(buildNativeAssets(balances, prices, pricedSnap.assets), available, sessionMode);
+      setAssets(assets);
 
       setSourceState("transactions", { status: sourceStatus, error: undefined });
       const historyResult = await loadWithTimeout(fetchWalletHistory(addresses, bitcoinAddress, prices, network), 38_000);
+      if (!isCurrentRequest()) return;
       const txs = historyResult.ok ? historyResult.value : useWalletStore.getState().transactions;
       setTxs(txs);
       setSourceState("transactions", {
@@ -166,8 +249,6 @@ export function useChainData() {
       });
 
       markUpdated();
-      setInitialLoaded(true);
-      setLoading(false);
 
       if (network === "mainnet") {
         setSourceState("tokens", { status: "refreshing", error: undefined });
@@ -175,6 +256,7 @@ export function useChainData() {
           hasEth || hasBsc ? loadWithTimeout(fetchAllEvmTokens(hasEth ? addresses.ethereum : EMPTY_EVM as `0x${string}`, hasBsc ? addresses.bsc : EMPTY_EVM as `0x${string}`), 25_000) : skipped([]),
           hasSol ? loadWithTimeout(getSplTokens(addresses.solana, network), 15_000) : skipped([]),
         ]);
+        if (!isCurrentRequest()) return;
         const storeSnap = useWalletStore.getState();
         const nextEvm = evmTokens.ok ? evmTokens.value : storeSnap.evmTokens;
         const nextSpl = splTokens.ok ? splTokens.value : storeSnap.splTokens;
@@ -191,22 +273,25 @@ export function useChainData() {
 
       const finalSnap = useWalletStore.getState();
       writeCache(cacheAddress(addresses, sessionMode), network, {
-        assets,
+        assets: finalSnap.assets,
         transactions: txs,
         evmTokens: finalSnap.evmTokens,
         splTokens: finalSnap.splTokens,
+        prices,
       });
     } catch (e) {
       const error = e instanceof Error ? e.message : "Chain data failed";
       console.error("Chain data error:", e);
-      setSourceState("balances", { status: "error", error });
-      setSourceState("transactions", { status: "error", error });
-      setInitialLoaded(true);
+      if (isCurrentRequest()) {
+        setSourceState("balances", { status: "error", error });
+        setSourceState("transactions", { status: "error", error });
+        setInitialLoaded(true);
+      }
     } finally {
-      setLoading(false);
-      activeRefresh = false;
+      if (isCurrentRequest()) setLoading(false);
+      if (activeRefreshKey === requestKey) activeRefreshKey = "";
     }
-  }, [addresses, markUpdated, mnemonic, network, sessionMode, setAssets, setInitialLoaded, setLoading, setPrices, setSourceState, setTokens, setTxs]);
+  }, [activeAccountIndex, activeAddressIndexes, addresses, markUpdated, mnemonic, network, sessionMode, setAssets, setInitialLoaded, setLoading, setPrices, setSourceState, setTokens, setTxs]);
 
   useEffect(() => {
     setWalletRefreshHandler(() => refresh(false));
@@ -226,6 +311,11 @@ export function useChainData() {
         setAssets(cached.assets);
         setTxs(cached.transactions);
         setTokens(cached.evmTokens ?? [], cached.splTokens ?? []);
+        setPrices(cached.prices ?? pricesFromAssets(cached.assets));
+        setSourceState("balances", { status: "refreshing", updatedAt: cached.ts, error: undefined });
+        setSourceState("prices", { status: "refreshing", updatedAt: cached.ts, error: undefined });
+        setSourceState("tokens", { status: "refreshing", updatedAt: cached.ts, error: undefined });
+        setSourceState("transactions", { status: "refreshing", updatedAt: cached.ts, error: undefined });
         setInitialLoaded(true);
       }
     }
@@ -234,7 +324,7 @@ export function useChainData() {
 
     const id = setInterval(() => refresh(true), 60_000);
     return () => clearInterval(id);
-  }, [addresses, network, refresh, sessionMode, setAssets, setInitialLoaded, setTokens, setTxs]);
+  }, [addresses, network, refresh, sessionMode, setAssets, setInitialLoaded, setPrices, setSourceState, setTokens, setTxs]);
 
   return { refresh: () => refresh(false) };
 }

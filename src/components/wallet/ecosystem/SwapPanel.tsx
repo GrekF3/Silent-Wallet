@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { parseUnits } from "viem";
 import { GlassButton } from "@/components/ui/GlassButton";
 import { GlassInput } from "@/components/ui/GlassInput";
+import { Skeleton } from "@/components/common/Skeleton";
 import { Icons } from "@/components/ui/Icon";
 import { useToast } from "@/components/ui/Toast";
 import { defaultTokensForChain, toZeroXTokenAddress } from "@/lib/ecosystem/chains";
@@ -13,6 +14,7 @@ import { getZeroXQuote } from "@/lib/ecosystem/zeroXClient";
 import { formatRawAmount } from "@/lib/ecosystem/fees";
 import type { EcosystemConfigResponse, EcosystemToken, SwapQuoteResponse } from "@/lib/ecosystem/types";
 import type { WalletAddresses } from "@/lib/wallet";
+import type { WalletAddressIndexes } from "@/lib/wallet";
 import type { Network } from "@/lib/chains";
 import type { SessionMode } from "@/lib/session";
 import { TokenAmountInput } from "./TokenAmountInput";
@@ -42,11 +44,24 @@ function rawAmount(amount: string, token: EcosystemToken) {
   return parseUnits(amount, token.decimals).toString();
 }
 
+function QuoteSkeleton() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 14, borderRadius: 16, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+      <Skeleton width="42%" height={12} radius={6} />
+      <Skeleton width="100%" height={38} radius={12} />
+      <Skeleton width="100%" height={38} radius={12} />
+      <Skeleton width="58%" height={11} radius={6} />
+    </div>
+  );
+}
+
 export function SwapPanel({
   config,
   tokens,
   addresses,
   mnemonic,
+  accountIndex,
+  addressIndexes,
   sessionMode,
   network,
 }: {
@@ -54,6 +69,8 @@ export function SwapPanel({
   tokens: EcosystemToken[];
   addresses: WalletAddresses | null;
   mnemonic: string | null;
+  accountIndex: number;
+  addressIndexes: WalletAddressIndexes;
   sessionMode: SessionMode;
   network: Network;
 }) {
@@ -139,6 +156,8 @@ export function SwapPanel({
     try {
       const hash = await approveErc20Exact({
         mnemonic,
+        accountIndex,
+        addressIndex: chainId === 56 ? addressIndexes.bsc : addressIndexes.ethereum,
         chainId,
         tokenAddress: fromToken.address as `0x${string}`,
         spender: quote.allowanceTarget,
@@ -160,7 +179,7 @@ export function SwapPanel({
     setExecuting(true);
     setExec({ status: "pending", label: "Sign swap transaction locally" });
     try {
-      const hash = await executeZeroXQuote({ mnemonic, quote });
+      const hash = await executeZeroXQuote({ mnemonic, accountIndex, addressIndex: chainId === 56 ? addressIndexes.bsc : addressIndexes.ethereum, quote });
       setExec({ status: "success", label: "Swap transaction submitted", txHash: hash, chainId });
       await logRevenueEvent({ provider: "0x", action: "execute", chain: String(chainId), tokenSymbols: [fromToken.symbol, toToken.symbol], feeBps: config?.defaultSwapFeeBps, quoteId: quote.quoteId, txHash: hash });
       toast("Swap submitted");
@@ -214,8 +233,10 @@ export function SwapPanel({
       <GlassInput label="Slippage tolerance" type="number" min="0" max="50" suffix="%" value={slippage} onChange={(e) => { setSlippage(e.target.value); clearQuote(); }} disabled={!!disabledReason} />
 
       <GlassButton variant="default" size="lg" onClick={requestQuote} disabled={loading || !!disabledReason || !amount} style={{ width: "100%" }}>
-        {loading ? "Getting quote..." : "Get 0x quote"}
+        Get 0x quote
       </GlassButton>
+
+      {loading && <QuoteSkeleton />}
 
       {quote && (
         <QuoteReview

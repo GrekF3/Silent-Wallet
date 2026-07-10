@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { parseUnits } from "viem";
 import { GlassButton } from "@/components/ui/GlassButton";
 import { GlassInput } from "@/components/ui/GlassInput";
+import { Skeleton } from "@/components/common/Skeleton";
 import { Icons } from "@/components/ui/Icon";
 import { useToast } from "@/components/ui/Toast";
 import { defaultTokensForChain, toLifiTokenAddress } from "@/lib/ecosystem/chains";
@@ -13,6 +14,7 @@ import { getLifiQuote, getLifiRoutes } from "@/lib/ecosystem/lifiClient";
 import { formatRawAmount } from "@/lib/ecosystem/fees";
 import type { BridgeQuoteResponse, BridgeRoute, EcosystemConfigResponse, EcosystemToken } from "@/lib/ecosystem/types";
 import type { WalletAddresses } from "@/lib/wallet";
+import type { WalletAddressIndexes } from "@/lib/wallet";
 import type { Network } from "@/lib/chains";
 import type { SessionMode } from "@/lib/session";
 import { TokenAmountInput } from "./TokenAmountInput";
@@ -42,6 +44,23 @@ function rawAmount(amount: string, token: EcosystemToken) {
   return parseUnits(amount, token.decimals).toString();
 }
 
+function RouteSkeleton() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <Skeleton width="32%" height={11} radius={6} />
+      {[0, 1, 2].map((index) => (
+        <div key={index} style={{ padding: "12px 14px", borderRadius: 15, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 9 }}>
+            <Skeleton width="34%" height={12} radius={6} />
+            <Skeleton width={62} height={11} radius={6} />
+          </div>
+          <Skeleton width="74%" height={11} radius={6} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function RouteCard({ route, active, onClick }: { route: BridgeRoute; active: boolean; onClick: () => void }) {
   const minutes = route.estimatedTimeSeconds ? Math.max(1, Math.round(route.estimatedTimeSeconds / 60)) : null;
   return (
@@ -62,6 +81,8 @@ export function BridgePanel({
   tokens,
   addresses,
   mnemonic,
+  accountIndex,
+  addressIndexes,
   sessionMode,
   network,
 }: {
@@ -69,6 +90,8 @@ export function BridgePanel({
   tokens: EcosystemToken[];
   addresses: WalletAddresses | null;
   mnemonic: string | null;
+  accountIndex: number;
+  addressIndexes: WalletAddressIndexes;
   sessionMode: SessionMode;
   network: Network;
 }) {
@@ -176,6 +199,8 @@ export function BridgePanel({
     try {
       const hash = await approveErc20Exact({
         mnemonic,
+        accountIndex,
+        addressIndex: fromChainId === 56 ? addressIndexes.bsc : addressIndexes.ethereum,
         chainId: fromChainId,
         tokenAddress: fromToken.address as `0x${string}`,
         spender: quote.approvalTarget,
@@ -197,7 +222,7 @@ export function BridgePanel({
     setExecuting(true);
     setExec({ status: "pending", label: "Sign bridge transaction locally" });
     try {
-      const hash = await executeLifiQuote({ mnemonic, quote });
+      const hash = await executeLifiQuote({ mnemonic, accountIndex, addressIndex: fromChainId === 56 ? addressIndexes.bsc : addressIndexes.ethereum, quote });
       setExec({ status: "success", label: "Bridge transaction submitted", txHash: hash, chainId: fromChainId });
       await logRevenueEvent({ provider: "lifi", action: "execute", chain: `${fromChainId}->${toChainId}`, tokenSymbols: [fromToken.symbol, toToken.symbol], feeBps: config ? Math.round(config.lifiFee * 10_000) : undefined, quoteId: quote.id, txHash: hash });
       toast("Bridge submitted");
@@ -254,8 +279,10 @@ export function BridgePanel({
       <GlassInput label="Slippage tolerance" type="number" min="0" max="50" suffix="%" value={slippage} onChange={(e) => { setSlippage(e.target.value); clearQuote(); }} disabled={!!disabledReason} />
 
       <GlassButton variant="default" size="lg" onClick={requestRoutes} disabled={loading || !!disabledReason || !amount || fromChainId === toChainId} style={{ width: "100%" }}>
-        {loading ? "Finding routes..." : "Quote LI.FI routes"}
+        Quote LI.FI routes
       </GlassButton>
+
+      {loading && <RouteSkeleton />}
 
       {routes.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

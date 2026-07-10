@@ -1,13 +1,14 @@
 "use client";
 import { create } from "zustand";
-import type { WalletAddresses } from "./wallet";
+import type { WalletAddresses, WalletAddressIndexes, WalletNetworkKey } from "./wallet";
+import { DEFAULT_ADDRESS_INDEXES, deriveAddresses, normalizeAddressIndexes } from "./wallet";
 import type { Prices } from "./prices";
 import type { ChainTx, Network } from "./chains";
 import type { EvmToken } from "./tokens";
 import type { SplToken } from "./solana";
 import { saveSession, saveWatchSession, clearSession as clearSess, type SessionMode } from "./session";
 
-export type View = "dashboard" | "asset" | "transfer" | "history" | "settings" | "ecosystem";
+export type View = "dashboard" | "asset" | "transfer" | "history" | "settings" | "ecosystem" | "learn" | "premium" | "accounts" | "addressBook";
 export type EcosystemTab = "ramp" | "swap" | "bridge";
 export type TransferTab = "send" | "receive";
 export type LoadStatus = "idle" | "loading" | "refreshing" | "ready" | "partial" | "error";
@@ -83,8 +84,12 @@ type WalletStore = {
   watchName:     string | null;
   mnemonic:      string | null;
   addresses:     WalletAddresses | null;
-  setSession:    (m: string, a: WalletAddresses) => void;
+  activeAccountIndex: number;
+  activeAddressIndexes: WalletAddressIndexes;
+  setSession:    (m: string, a: WalletAddresses, accountIndex?: number, addressIndexes?: WalletAddressIndexes) => void;
   setWatchSession: (name: string, a: WalletAddresses) => void;
+  setActiveAccountIndex: (index: number) => void;
+  setActiveAddressIndex: (network: WalletNetworkKey, index: number) => void;
   clearSession:  () => void;
 
   network:       Network;
@@ -138,9 +143,66 @@ export const useWalletStore = create<WalletStore>((set) => ({
   watchName: null,
   mnemonic:  null,
   addresses: null,
-  setSession: (mnemonic, addresses) => { saveSession(mnemonic, addresses); set({ sessionMode: "wallet", watchName: null, mnemonic, addresses }); },
-  setWatchSession: (watchName, addresses) => { saveWatchSession(watchName, addresses); set({ sessionMode: "watch", watchName, mnemonic: null, addresses, view: "dashboard" }); },
-  clearSession: () => { clearSess(); set({ sessionMode: "wallet", watchName: null, mnemonic: null, addresses: null, assets: [], evmTokens: [], splTokens: [], transactions: [], selectedAssetRef: null, selectedAsset: null, transferIntent: null, initialLoaded: false, lastUpdated: null }); },
+  activeAccountIndex: 0,
+  activeAddressIndexes: DEFAULT_ADDRESS_INDEXES,
+  setSession: (mnemonic, addresses, activeAccountIndex = 0, addressIndexes = DEFAULT_ADDRESS_INDEXES) => {
+    const activeAddressIndexes = normalizeAddressIndexes(addressIndexes);
+    saveSession(mnemonic, addresses, activeAccountIndex, activeAddressIndexes);
+    set({ sessionMode: "wallet", watchName: null, mnemonic, addresses, activeAccountIndex, activeAddressIndexes });
+  },
+  setWatchSession: (watchName, addresses) => { saveWatchSession(watchName, addresses); set({ sessionMode: "watch", watchName, mnemonic: null, addresses, activeAccountIndex: 0, activeAddressIndexes: DEFAULT_ADDRESS_INDEXES, view: "dashboard" }); },
+  setActiveAccountIndex: (activeAccountIndex) => set((state) => {
+    if (!state.mnemonic || state.sessionMode === "watch") return {};
+    const activeAddressIndexes = DEFAULT_ADDRESS_INDEXES;
+    const addresses = deriveAddresses(state.mnemonic, activeAccountIndex, activeAddressIndexes);
+    saveSession(state.mnemonic, addresses, activeAccountIndex, activeAddressIndexes);
+    return {
+      activeAccountIndex,
+      activeAddressIndexes,
+      addresses,
+      assets: [],
+      evmTokens: [],
+      splTokens: [],
+      transactions: [],
+      selectedAssetRef: null,
+      selectedAsset: null,
+      transferIntent: null,
+      initialLoaded: false,
+      lastUpdated: null,
+      loadingState: {
+        balances:     { status: "idle" },
+        prices:       state.loadingState.prices,
+        tokens:       { status: "idle" },
+        transactions: { status: "idle" },
+      },
+    };
+  }),
+  setActiveAddressIndex: (network, index) => set((state) => {
+    if (!state.mnemonic || state.sessionMode === "watch") return {};
+    const activeAddressIndexes = normalizeAddressIndexes({ ...state.activeAddressIndexes, [network]: index });
+    const addresses = deriveAddresses(state.mnemonic, state.activeAccountIndex, activeAddressIndexes);
+    saveSession(state.mnemonic, addresses, state.activeAccountIndex, activeAddressIndexes);
+    return {
+      activeAddressIndexes,
+      addresses,
+      assets: [],
+      evmTokens: [],
+      splTokens: [],
+      transactions: [],
+      selectedAssetRef: null,
+      selectedAsset: null,
+      transferIntent: null,
+      initialLoaded: false,
+      lastUpdated: null,
+      loadingState: {
+        balances:     { status: "idle" },
+        prices:       state.loadingState.prices,
+        tokens:       { status: "idle" },
+        transactions: { status: "idle" },
+      },
+    };
+  }),
+  clearSession: () => { clearSess(); set({ sessionMode: "wallet", watchName: null, mnemonic: null, addresses: null, activeAccountIndex: 0, activeAddressIndexes: DEFAULT_ADDRESS_INDEXES, assets: [], evmTokens: [], splTokens: [], transactions: [], selectedAssetRef: null, selectedAsset: null, transferIntent: null, initialLoaded: false, lastUpdated: null }); },
 
   network:    "mainnet",
   setNetwork: (network) => set({ network, assets: [], evmTokens: [], splTokens: [], transactions: [], selectedAssetRef: null, selectedAsset: null, transferIntent: null, initialLoaded: false, lastUpdated: null }),

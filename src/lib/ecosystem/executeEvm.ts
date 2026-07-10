@@ -62,13 +62,15 @@ export async function getErc20Allowance(params: {
 
 export async function approveErc20Exact(params: {
   mnemonic: string;
+  accountIndex?: number;
+  addressIndex?: number;
   chainId: number;
   tokenAddress: `0x${string}`;
   spender: `0x${string}`;
   amount: string;
 }): Promise<Hash> {
   const chainId = assertExecutableChainId(params.chainId);
-  const privateKey = derivePrivateKey(params.mnemonic);
+  const privateKey = derivePrivateKey(params.mnemonic, params.accountIndex ?? 0, params.addressIndex ?? 0);
   const account = privateKeyToAccount(privateKeyHex(privateKey));
   const client = createWalletClient({ account, chain: chainForId(chainId), transport: http(rpcForId(chainId)) });
   const data = encodeFunctionData({
@@ -81,11 +83,13 @@ export async function approveErc20Exact(params: {
 
 export async function sendEvmTransaction(params: {
   mnemonic: string;
+  accountIndex?: number;
+  addressIndex?: number;
   chainId: number;
   transaction: EvmTransactionRequest;
 }): Promise<Hash> {
   const chainId = assertExecutableChainId(params.chainId);
-  const privateKey = derivePrivateKey(params.mnemonic);
+  const privateKey = derivePrivateKey(params.mnemonic, params.accountIndex ?? 0, params.addressIndex ?? 0);
   const account = privateKeyToAccount(privateKeyHex(privateKey));
   const client = createWalletClient({ account, chain: chainForId(chainId), transport: http(rpcForId(chainId)) });
   return client.sendTransaction({
@@ -97,11 +101,15 @@ export async function sendEvmTransaction(params: {
 
 export async function executeZeroXQuote(params: {
   mnemonic: string;
+  accountIndex?: number;
+  addressIndex?: number;
   quote: SwapQuoteResponse;
 }): Promise<Hash> {
   if (!params.quote.transaction) throw new Error("Quote is missing transaction data");
   return sendEvmTransaction({
     mnemonic: params.mnemonic,
+    accountIndex: params.accountIndex,
+    addressIndex: params.addressIndex,
     chainId: params.quote.chainId,
     transaction: params.quote.transaction,
   });
@@ -109,11 +117,15 @@ export async function executeZeroXQuote(params: {
 
 export async function executeLifiQuote(params: {
   mnemonic: string;
+  accountIndex?: number;
+  addressIndex?: number;
   quote: BridgeQuoteResponse;
 }): Promise<Hash> {
   if (!params.quote.transaction) throw new Error("Route is missing transaction data");
   return sendEvmTransaction({
     mnemonic: params.mnemonic,
+    accountIndex: params.accountIndex,
+    addressIndex: params.addressIndex,
     chainId: params.quote.fromChainId,
     transaction: params.quote.transaction,
   });

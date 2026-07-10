@@ -26,13 +26,16 @@ export function CryptoIcon({ symbol, image, size = 28 }: Props) {
   if (failed || !src) {
     return (
       <span style={{
-        fontSize:   size * 0.52,
+        fontSize:   size * 0.58,
         fontWeight: 700,
         color:      "#fff",
         lineHeight: 1,
+        width:      size,
+        height:     size,
         display:    "flex",
         alignItems: "center",
         justifyContent: "center",
+        filter:     "drop-shadow(0 8px 14px rgba(0,0,0,0.45))",
       }}>
         {symbol[0]}
       </span>
@@ -47,7 +50,13 @@ export function CryptoIcon({ symbol, image, size = 28 }: Props) {
       width={size}
       height={size}
       onError={() => setFailed(true)}
-      style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", display: "block" }}
+      style={{
+        width: size,
+        height: size,
+        objectFit: "contain",
+        display: "block",
+        filter: "drop-shadow(0 8px 14px rgba(0,0,0,0.45))",
+      }}
     />
   );
 }

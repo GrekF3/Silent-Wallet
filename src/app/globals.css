@@ -3,6 +3,9 @@
 /* ─── Tokens ────────────────────────────────────────────────── */
 :root {
   --bg:          #080808;
+  --theme-surface: rgba(255,255,255,0.055);
+  --theme-surface-strong: rgba(255,255,255,0.08);
+  --theme-border: rgba(255,255,255,0.11);
   --sidebar-w:   68px;
 
   /* Glass fills */
@@ -63,8 +66,8 @@ body {
 
 /* ─── Glass card ────────────────────────────────────────────── */
 .card {
-  background:    var(--glass-sm);
-  border:        1px solid var(--b-soft);
+  background:    var(--theme-surface);
+  border:        1px solid var(--theme-border);
   border-top-color: var(--b-bright);
   border-radius: 20px;
   box-shadow:    var(--card-shadow);
@@ -543,6 +546,18 @@ body {
     display: none;
   }
 
+  .topbar-actions .account-selector-button {
+    width: 36px !important;
+    min-width: 36px !important;
+    padding: 0 !important;
+    justify-content: center;
+  }
+
+  .topbar-actions .account-selector-copy,
+  .topbar-actions .account-selector-chevron {
+    display: none !important;
+  }
+
   .dashboard-popover {
     position: fixed;
     left: 12px;
@@ -707,6 +722,6 @@ body {
   }
 
   .bottom-nav-item {
-    font-size: 9px;
+    font-size: 8.5px;
   }
 }

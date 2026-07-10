@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { Skeleton, SkeletonPanel } from "@/components/common/Skeleton";
 import { Icons } from "@/components/ui/Icon";
 import { useWalletStore, type EcosystemTab, type AssetInfo } from "@/lib/store";
 import { getEcosystemConfig } from "@/lib/ecosystem/client";
@@ -123,11 +124,15 @@ export function EcosystemView() {
     mnemonic,
     sessionMode,
     network,
+    activeAccountIndex,
+    activeAddressIndexes,
     ecosystemTab,
     setEcosystemTab,
+    setView,
   } = useWalletStore();
   const [config, setConfig] = useState<EcosystemConfigResponse | null>(null);
   const [configError, setConfigError] = useState("");
+  const configLoading = config === null && !configError;
 
   useEffect(() => {
     let alive = true;
@@ -151,7 +156,7 @@ export function EcosystemView() {
       style={{ padding: "32px 28px", maxWidth: 720, display: "flex", flexDirection: "column", gap: 20 }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14 }}>
         <div>
-          <span className="label">Wallet tools</span>
+          <span className="label">Web3 ecosystem</span>
           <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ fontSize: 28, fontWeight: 300, color: "#fff", letterSpacing: 0 }}>Web3</div>
             <HelpTooltip label="About Web3">
@@ -160,6 +165,18 @@ export function EcosystemView() {
           </div>
         </div>
       </div>
+
+      <GlassCard style={{ padding: 16, borderRadius: 20 }}>
+        <div style={{ display: "flex", gap: 10 }}>
+          <Icons.info size={15} color="rgba(255,255,255,0.46)" />
+          <div style={{ fontSize: 12, lineHeight: 1.55, color: "rgba(255,255,255,0.36)" }}>
+            Buy, sell, swap, and bridge are provider surfaces. They use public quote details and the active account address. Private keys stay on this device; unsupported or unconfigured providers remain disabled.
+            <button type="button" onClick={() => setView("learn")} style={{ marginLeft: 8, padding: 0, border: "none", background: "transparent", color: "rgba(255,255,255,0.62)", font: "inherit", cursor: "pointer" }}>
+              Open Academy
+            </button>
+          </div>
+        </div>
+      </GlassCard>
 
       <GlassCard style={{ padding: 4, borderRadius: 16 }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 4 }}>
@@ -189,9 +206,21 @@ export function EcosystemView() {
       )}
 
       <GlassCard elevated style={{ padding: 18, borderRadius: 20 }}>
-        {ecosystemTab === "ramp" && <RampPanel config={config} tokens={tokens} addresses={addresses} />}
-        {ecosystemTab === "swap" && <SwapPanel config={config} tokens={tokens} addresses={addresses} mnemonic={mnemonic} sessionMode={sessionMode} network={network} />}
-        {ecosystemTab === "bridge" && <BridgePanel config={config} tokens={tokens} addresses={addresses} mnemonic={mnemonic} sessionMode={sessionMode} network={network} />}
+        {configLoading ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <Skeleton width={120} height={20} radius={8} />
+              <Skeleton width={88} height={26} radius={13} />
+            </div>
+            <SkeletonPanel rows={6} />
+          </div>
+        ) : (
+          <>
+            {ecosystemTab === "ramp" && <RampPanel config={config} tokens={tokens} addresses={addresses} />}
+            {ecosystemTab === "swap" && <SwapPanel config={config} tokens={tokens} addresses={addresses} mnemonic={mnemonic} accountIndex={activeAccountIndex} addressIndexes={activeAddressIndexes} sessionMode={sessionMode} network={network} />}
+            {ecosystemTab === "bridge" && <BridgePanel config={config} tokens={tokens} addresses={addresses} mnemonic={mnemonic} accountIndex={activeAccountIndex} addressIndexes={activeAddressIndexes} sessionMode={sessionMode} network={network} />}
+          </>
+        )}
       </GlassCard>
     </motion.div>
   );
