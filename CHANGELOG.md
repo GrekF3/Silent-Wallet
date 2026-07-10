@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.5
+
+- Added Silent Pro premium licensing flows and entitlement checks.
+- Added account management, address book, privacy controls, and CSV exports.
+- Improved onboarding, transaction review warnings, wallet UX, and learning content.
+
 ## 0.1.4
 
 - macOS release packaging fix.
