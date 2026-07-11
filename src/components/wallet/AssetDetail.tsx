@@ -8,6 +8,7 @@ import { useWalletStore } from "@/lib/store";
 import { formatUSD, formatCrypto, formatDate } from "@/lib/utils";
 import { CryptoIcon } from "@/components/ui/CryptoIcon";
 import { InteractiveChart, type ChartPoint } from "@/components/ui/InteractiveChart";
+import { visibleHistoryTransactions } from "@/lib/tokenVerification";
 
 const NET_COLOR: Record<string, string> = {
   ethereum: "rgba(98,88,255,0.12)", bitcoin: "rgba(247,147,26,0.12)",
@@ -16,7 +17,7 @@ const NET_COLOR: Record<string, string> = {
 const NET_LABEL: Record<string, string> = { ethereum: "ETH", bitcoin: "BTC", bsc: "BSC", solana: "SOL" };
 
 export function AssetDetail() {
-  const { selectedAsset, closeAsset, openTransfer, transactions, sessionMode } = useWalletStore();
+  const { selectedAsset, closeAsset, openTransfer, transactions, sessionMode, verifiedHistoryOnly } = useWalletStore();
   const chartPoints = useMemo<ChartPoint[]>(() => selectedAsset
     ? selectedAsset.spark7d.map((value, index) => ({
       value,
@@ -30,7 +31,7 @@ export function AssetDetail() {
   const a   = selectedAsset;
   const pos = a.change24h >= 0;
   const valueLabel = a.priceUSD > 0 ? formatUSD(a.balance * a.priceUSD) : (a.balance > 0 ? "Pricing..." : formatUSD(0));
-  const txs = transactions.filter((t) => t.asset === a.symbol).slice(0, 4);
+  const txs = visibleHistoryTransactions(transactions, verifiedHistoryOnly).filter((t) => t.asset === a.symbol).slice(0, 4);
   const watchOnly = sessionMode === "watch";
 
   return (

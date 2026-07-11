@@ -52,23 +52,26 @@ type WalletPrefs = {
   privacyMode: boolean;
   hideZeroBalances: boolean;
   hiddenAssetIds: string[];
+  verifiedHistoryOnly: boolean;
 };
 
 const PREFS_KEY = "silent_wallet_prefs_v1";
+const DEFAULT_PREFS: WalletPrefs = { privacyMode: false, hideZeroBalances: false, hiddenAssetIds: [], verifiedHistoryOnly: true };
 
 function readPrefs(): WalletPrefs {
-  if (typeof window === "undefined") return { privacyMode: false, hideZeroBalances: false, hiddenAssetIds: [] };
+  if (typeof window === "undefined") return DEFAULT_PREFS;
   try {
     const raw = localStorage.getItem(PREFS_KEY);
-    if (!raw) return { privacyMode: false, hideZeroBalances: false, hiddenAssetIds: [] };
+    if (!raw) return DEFAULT_PREFS;
     const parsed = JSON.parse(raw) as Partial<WalletPrefs>;
     return {
       privacyMode: !!parsed.privacyMode,
       hideZeroBalances: !!parsed.hideZeroBalances,
       hiddenAssetIds: Array.isArray(parsed.hiddenAssetIds) ? parsed.hiddenAssetIds.filter((id) => typeof id === "string") : [],
+      verifiedHistoryOnly: parsed.verifiedHistoryOnly !== false,
     };
   } catch {
-    return { privacyMode: false, hideZeroBalances: false, hiddenAssetIds: [] };
+    return DEFAULT_PREFS;
   }
 }
 
@@ -119,6 +122,7 @@ type WalletStore = {
   privacyMode:   boolean;
   hideZeroBalances: boolean;
   hiddenAssetIds: string[];
+  verifiedHistoryOnly: boolean;
 
   setAssets:        (a: AssetInfo[]) => void;
   setTokens:        (evm: EvmToken[], spl: SplToken[]) => void;
@@ -131,6 +135,7 @@ type WalletStore = {
   setPrivacyMode:   (v: boolean) => void;
   setHideZeroBalances: (v: boolean) => void;
   toggleHiddenAsset: (id: string) => void;
+  setVerifiedHistoryOnly: (v: boolean) => void;
 
   historyFilter: "all" | "send" | "receive";
   setFilter:     (f: "all" | "send" | "receive") => void;
@@ -236,6 +241,7 @@ export const useWalletStore = create<WalletStore>((set) => ({
   privacyMode:   initialPrefs.privacyMode,
   hideZeroBalances: initialPrefs.hideZeroBalances,
   hiddenAssetIds: initialPrefs.hiddenAssetIds,
+  verifiedHistoryOnly: initialPrefs.verifiedHistoryOnly,
 
   setAssets:        (assets)      => set((state) => {
     const selectedAsset = state.selectedAssetRef?.kind === "native"
@@ -256,12 +262,12 @@ export const useWalletStore = create<WalletStore>((set) => ({
   setInitialLoaded: (initialLoaded) => set({ initialLoaded }),
   markUpdated:      () => set({ lastUpdated: Date.now() }),
   setPrivacyMode:   (privacyMode) => set((state) => {
-    const prefs = { privacyMode, hideZeroBalances: state.hideZeroBalances, hiddenAssetIds: state.hiddenAssetIds };
+    const prefs = { privacyMode, hideZeroBalances: state.hideZeroBalances, hiddenAssetIds: state.hiddenAssetIds, verifiedHistoryOnly: state.verifiedHistoryOnly };
     writePrefs(prefs);
     return { privacyMode };
   }),
   setHideZeroBalances: (hideZeroBalances) => set((state) => {
-    const prefs = { privacyMode: state.privacyMode, hideZeroBalances, hiddenAssetIds: state.hiddenAssetIds };
+    const prefs = { privacyMode: state.privacyMode, hideZeroBalances, hiddenAssetIds: state.hiddenAssetIds, verifiedHistoryOnly: state.verifiedHistoryOnly };
     writePrefs(prefs);
     return { hideZeroBalances };
   }),
@@ -269,8 +275,12 @@ export const useWalletStore = create<WalletStore>((set) => ({
     const hiddenAssetIds = state.hiddenAssetIds.includes(id)
       ? state.hiddenAssetIds.filter((assetId) => assetId !== id)
       : [...state.hiddenAssetIds, id];
-    writePrefs({ privacyMode: state.privacyMode, hideZeroBalances: state.hideZeroBalances, hiddenAssetIds });
+    writePrefs({ privacyMode: state.privacyMode, hideZeroBalances: state.hideZeroBalances, hiddenAssetIds, verifiedHistoryOnly: state.verifiedHistoryOnly });
     return { hiddenAssetIds };
+  }),
+  setVerifiedHistoryOnly: (verifiedHistoryOnly) => set((state) => {
+    writePrefs({ privacyMode: state.privacyMode, hideZeroBalances: state.hideZeroBalances, hiddenAssetIds: state.hiddenAssetIds, verifiedHistoryOnly });
+    return { verifiedHistoryOnly };
   }),
 
   historyFilter: "all",

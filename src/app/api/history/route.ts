@@ -3,6 +3,7 @@ import { formatEther } from "viem";
 import { solanaRpcUrl } from "@/lib/config";
 import { fetchEvmRawHistory } from "@/lib/serverEvmHistory";
 import type { ChainTx, Network } from "@/lib/chains";
+import { verifiedEvmToken, verifiedTokenAmountUSD } from "@/lib/tokenVerification";
 
 export const dynamic = "force-dynamic";
 
@@ -53,26 +54,24 @@ function parseUnix(input: string | undefined) {
   return n > 9_999_999_999 ? n : n * 1000;
 }
 
-function tokenPriceUSD(symbol: string, amount: number) {
-  const stable = new Set(["USDT", "USDC", "BSC-USD", "BUSD", "DAI", "USDE", "TUSD", "USDP"]);
-  return stable.has(symbol.toUpperCase()) ? amount : 0;
-}
-
 function parseEvmTx(raw: ApiRawTx, address: string, nativeAsset: "ETH" | "BNB", nativePriceUSD: number): ChainTx {
   const isToken = raw.type === "token" || !!raw.tokenSymbol;
-  const decimals = isToken ? (parseInt(raw.tokenDecimal ?? "18", 10) || 18) : 18;
+  const txNetwork = raw.chain === "bsc" ? "bsc" : "ethereum";
+  const verifiedToken = isToken ? verifiedEvmToken(txNetwork, raw.contractAddress) : undefined;
+  const decimals = isToken ? (verifiedToken?.decimals ?? (parseInt(raw.tokenDecimal ?? "18", 10) || 18)) : 18;
   const amount = isToken
     ? parseRawValue(raw.value, decimals)
     : parseFloat(formatEther(raw.value?.startsWith("0x") ? BigInt(raw.value) : BigInt((raw.value ?? "0").replace(/[^0-9]/g, "") || "0")));
   const isReceive = (raw.to ?? "").toLowerCase() === address.toLowerCase();
-  const symbol = isToken ? (raw.tokenSymbol || "TOKEN") : nativeAsset;
+  const symbol = isToken ? (verifiedToken?.symbol ?? raw.tokenSymbol ?? "TOKEN") : nativeAsset;
+  const absoluteAmount = Math.abs(Number.isFinite(amount) ? amount : 0);
 
   return {
     hash: raw.hash,
     type: isReceive ? "receive" : "send",
     asset: symbol,
-    amount: Math.abs(Number.isFinite(amount) ? amount : 0),
-    amountUSD: isToken ? tokenPriceUSD(symbol, Math.abs(Number.isFinite(amount) ? amount : 0)) : Math.abs(Number.isFinite(amount) ? amount : 0) * nativePriceUSD,
+    amount: absoluteAmount,
+    amountUSD: isToken ? verifiedTokenAmountUSD(txNetwork, raw.contractAddress, absoluteAmount) : absoluteAmount * nativePriceUSD,
     from: raw.from ?? "",
     to: raw.to ?? "",
     date: new Date(parseUnix(raw.timeStamp)),
@@ -81,8 +80,9 @@ function parseEvmTx(raw: ApiRawTx, address: string, nativeAsset: "ETH" | "BNB", 
     tokenSymbol: isToken ? symbol : undefined,
     tokenImage: raw.tokenImage,
     tokenContract: raw.contractAddress,
-    network: raw.chain === "bsc" ? "bsc" : "ethereum",
+    network: txNetwork,
     id: raw.uniqueId ?? `${raw.hash}:${raw.type ?? "native"}:${raw.contractAddress ?? ""}:${raw.logIndex ?? ""}:${symbol}`,
+    verification: isToken ? (verifiedToken ? "verified" : "unverified") : "native",
   };
 }
 
@@ -135,6 +135,7 @@ async function fetchBtcHistory(address: string, priceUSD: number, network: Netwo
       status: confirmed ? "confirmed" : "pending",
       network: "bitcoin",
       id: `${tx.txid}:btc`,
+      verification: "native",
     } satisfies ChainTx;
   }).filter((tx) => tx.amount > 0);
 }
@@ -194,6 +195,7 @@ async function fetchSolHistory(address: string, priceUSD: number, network: Netwo
       status: sig.err ? "failed" : "confirmed",
       network: "solana",
       id: `${sig.signature}:sol`,
+      verification: "native",
     } satisfies ChainTx;
   }).filter((tx) => tx.amount > 0 || tx.status === "failed");
 }

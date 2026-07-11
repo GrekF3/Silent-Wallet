@@ -5,6 +5,16 @@ export const DEFAULT_UPDATE_DOWNLOAD_URL =
   process.env.NEXT_PUBLIC_UPDATE_DOWNLOAD_URL || "https://github.com/GrekF3/Silent-Wallet/releases/latest";
 
 export const CHANGELOG_BY_VERSION: Record<string, string[]> = {
+  "0.1.7": [
+    "Verified-token history filtering hides unknown incoming token spam by default.",
+    "Hidden activity remains available through a temporary reveal control.",
+    "Stablecoin values are now verified by network and contract instead of symbol.",
+  ],
+  "0.1.6": [
+    "English and Russian interface switching.",
+    "Windows native data loading fix.",
+    "Improved Web3 layouts and hosted data proxy support.",
+  ],
   "0.1.4": [
     "macOS release packaging fix.",
     "Wallet creation stability hotfix.",

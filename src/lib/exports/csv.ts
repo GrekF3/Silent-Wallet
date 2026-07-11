@@ -2,6 +2,7 @@ import type { AddressBookContact } from "@/lib/addressBook/types";
 import type { WalletAccount } from "@/lib/accounts/types";
 import type { ChainTx } from "@/lib/chains";
 import type { AssetInfo } from "@/lib/store";
+import { transactionVerification } from "@/lib/tokenVerification";
 
 function esc(value: unknown) {
   const text = String(value ?? "");
@@ -42,7 +43,7 @@ export function accountsToCsv(accounts: WalletAccount[]) {
 
 export function transactionsToCsv(transactions: ChainTx[]) {
   return buildCsv([
-    ["hash", "type", "asset", "amount", "amount_usd", "from", "to", "network", "status", "date"],
+    ["hash", "type", "asset", "amount", "amount_usd", "from", "to", "network", "status", "verification", "date"],
     ...transactions.map((tx) => [
       tx.hash,
       tx.type,
@@ -53,6 +54,7 @@ export function transactionsToCsv(transactions: ChainTx[]) {
       tx.to,
       tx.network ?? "",
       tx.status,
+      transactionVerification(tx),
       tx.date.toISOString(),
     ]),
   ]);

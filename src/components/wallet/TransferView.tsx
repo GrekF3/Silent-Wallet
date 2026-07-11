@@ -26,6 +26,7 @@ import { useI18n } from "@/lib/i18n";
 import { createAccountAddressSlot, useAccountAddressSlots, useWalletAccounts } from "@/lib/accounts/storage";
 import type { AccountAddressNetwork, WalletAccount } from "@/lib/accounts/types";
 import { usePremium } from "@/lib/premium/entitlements";
+import { transactionVerification } from "@/lib/tokenVerification";
 
 /* ── Normalised picker asset ─────────────────────────────────────── */
 type PickAsset = {
@@ -636,9 +637,11 @@ export function TransferView() {
         status: "pending" as const,
         isToken: selectedAsset.isToken,
         tokenSymbol: selectedAsset.isToken ? selectedAsset.symbol : undefined,
+        tokenContract: selectedAsset.tokenKind === "evm" ? selectedAsset.contract : undefined,
+        network: selectedAsset.network,
         id: `${hash}:pending:${selectedAsset.id}`,
       };
-      setTxs([pending, ...useWalletStore.getState().transactions.filter((t) => t.hash !== hash)]);
+      setTxs([{ ...pending, verification: transactionVerification(pending) }, ...useWalletStore.getState().transactions.filter((t) => t.hash !== hash)]);
       setStep("done");
       toast("Transaction broadcast!");
     } catch (e) {

@@ -4,6 +4,7 @@ import type { ChainTx, Network } from "./chains";
 import type { Prices } from "./prices";
 import type { WalletAddresses } from "./wallet";
 import { dataProxyFetch, dataProxyPath } from "./api";
+import { withTransactionVerification } from "./tokenVerification";
 
 type ApiHistoryTx = Omit<ChainTx, "date"> & { date: string };
 
@@ -36,6 +37,6 @@ export async function fetchWalletHistory(
     throw new Error(d.errors.join("; "));
   }
   return (d.transactions ?? [])
-    .map((tx) => ({ ...tx, date: new Date(tx.date) }))
+    .map((tx) => withTransactionVerification({ ...tx, date: new Date(tx.date) }))
     .sort((a, b) => b.date.getTime() - a.date.getTime());
 }

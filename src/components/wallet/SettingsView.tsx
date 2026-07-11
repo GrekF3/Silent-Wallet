@@ -16,9 +16,9 @@ const T = {
   label: { fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "rgba(255,255,255,0.28)", marginBottom: 10, display: "block" } as React.CSSProperties,
 };
 
-function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
+function Toggle({ on, onChange, label }: { on: boolean; onChange: () => void; label: string }) {
   return (
-    <motion.button onClick={onChange} whileTap={{ scale: 0.93 }} style={{
+    <motion.button type="button" aria-label={label} aria-pressed={on} onClick={onChange} whileTap={{ scale: 0.93 }} style={{
       position: "relative", width: 44, height: 26, borderRadius: 13, cursor: "pointer", flexShrink: 0,
       border: `1px solid ${on ? "rgba(255,255,255,0.30)" : "rgba(255,255,255,0.10)"}`,
       borderTop: `1px solid ${on ? "rgba(255,255,255,0.42)" : "rgba(255,255,255,0.18)"}`,
@@ -231,7 +231,7 @@ function SecurityPanel({
 
 export function SettingsView() {
   const { language, setLanguage, t } = useI18n();
-  const { mnemonic, clearSession, network, setNetwork, sessionMode, hideZeroBalances, setHideZeroBalances, setView } = useWalletStore();
+  const { mnemonic, clearSession, network, setNetwork, sessionMode, hideZeroBalances, setHideZeroBalances, verifiedHistoryOnly, setVerifiedHistoryOnly, setView } = useWalletStore();
   const watchOnly = sessionMode === "watch";
 
   const [showPhrase, setShowPhrase] = useState(false);
@@ -292,7 +292,8 @@ export function SettingsView() {
                 ))}
               </div>
             )} />
-            <SettingsRow icon="eye" title={t("Hide zero balances")} body={t("Keep asset lists compact.")} right={<Toggle on={hideZeroBalances} onChange={() => setHideZeroBalances(!hideZeroBalances)} />} />
+            <SettingsRow icon="eye" title={t("Hide zero balances")} body={t("Keep asset lists compact.")} right={<Toggle label={t("Hide zero balances")} on={hideZeroBalances} onChange={() => setHideZeroBalances(!hideZeroBalances)} />} />
+            <SettingsRow icon="shield" title={t("Verified token history only")} body={t("Hide unknown incoming tokens while keeping outgoing activity visible.")} right={<Toggle label={t("Verified token history only")} on={verifiedHistoryOnly} onChange={() => setVerifiedHistoryOnly(!verifiedHistoryOnly)} />} />
           </SectionCard>
         </div>
 

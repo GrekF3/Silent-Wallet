@@ -17,6 +17,7 @@ import { AccountSelector } from "@/components/accounts/AccountSelector";
 import { useWalletAccounts } from "@/lib/accounts/storage";
 import { useUserExperience } from "@/lib/userExperience/mode";
 import { useI18n } from "@/lib/i18n";
+import { transactionVerification, visibleHistoryTransactions } from "@/lib/tokenVerification";
 
 type WalletNetwork = "ethereum" | "bitcoin" | "bsc" | "solana";
 type SortMode = "value" | "name";
@@ -337,7 +338,7 @@ export function Dashboard() {
   const {
     assets, evmTokens, splTokens, transactions, addresses, loading, initialLoaded, loadingState, lastUpdated, setView, openTransfer, setEcosystemTab, openAsset,
     sessionMode, watchName, activeAccountIndex,
-    privacyMode, setPrivacyMode, hideZeroBalances, setHideZeroBalances, hiddenAssetIds,
+    privacyMode, setPrivacyMode, hideZeroBalances, setHideZeroBalances, hiddenAssetIds, verifiedHistoryOnly,
   } = useWalletStore();
   const ux = useUserExperience();
   const accounts = useWalletAccounts();
@@ -429,7 +430,7 @@ export function Dashboard() {
   const pct = total > 0 ? (totalChange / (total - totalChange || total)) * 100 : 0;
   const pos = pct >= 0;
   const q = search.toLowerCase().trim();
-  const recentActivity = transactions.slice(0, 3);
+  const recentActivity = visibleHistoryTransactions(transactions, verifiedHistoryOnly).slice(0, 3);
   const activeAccount = accounts.find((account) => account.index === activeAccountIndex) ?? accounts[0];
   const hasUnpricedBalance = activeAssets.some((asset) => asset.balance > 0 && asset.priceUSD <= 0);
 
@@ -676,7 +677,10 @@ export function Dashboard() {
                 {tx.type === "receive" ? <Icons.receive size={14} color="rgba(255,255,255,0.55)" /> : <Icons.send size={14} color="rgba(255,255,255,0.55)" />}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 650, color: "#fff" }}>{t(tx.type === "receive" ? "Received" : "Sent")} {tx.asset}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 13, fontWeight: 650, color: "#fff" }}>{t(tx.type === "receive" ? "Received" : "Sent")} {tx.asset}</span>
+                  {transactionVerification(tx) === "unverified" && <span style={{ fontSize: 9, padding: "2px 6px", borderRadius: 6, background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.18)", color: "rgba(251,191,36,0.76)", fontWeight: 650 }}>{t("Unverified token")}</span>}
+                </div>
                 <div style={{ marginTop: 2, fontSize: 11, color: "rgba(255,255,255,0.26)" }}>{formatDate(tx.date)}</div>
               </div>
               <div style={{ textAlign: "right", fontSize: 13, fontWeight: 650, color: tx.type === "receive" ? "rgba(120,220,90,0.82)" : "rgba(255,255,255,0.54)" }}>

@@ -1,4 +1,5 @@
 import type { EcosystemChain, EcosystemChainKey, EcosystemToken } from "./types";
+import { VERIFIED_EVM_TOKENS } from "../tokenVerification";
 
 export const ZEROX_NATIVE_TOKEN = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 export const LIFI_NATIVE_TOKEN = "0x0000000000000000000000000000000000000000";
@@ -144,22 +145,23 @@ export function defaultTokensForChain(chainId: number): EcosystemToken[] {
   if (chainId === 1) {
     return [
       nativeToken("ethereum", 1, "ETH", "Ether"),
-      evmToken("ethereum", 1, "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", "WETH", "Wrapped Ether", 18),
-      evmToken("ethereum", 1, "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "USDC", "USD Coin", 6),
-      evmToken("ethereum", 1, "0xdAC17F958D2ee523a2206206994597C13D831ec7", "USDT", "Tether USD", 6),
-      evmToken("ethereum", 1, "0x6B175474E89094C44Da98b954EedeAC495271d0F", "DAI", "Dai Stablecoin", 18),
+      ...verifiedDefaults("ethereum", 1, ["WETH", "USDC", "USDT", "DAI"]),
     ];
   }
   if (chainId === 56) {
     return [
       nativeToken("bsc", 56, "BNB", "BNB"),
-      evmToken("bsc", 56, "0x55d398326f99059fF775485246999027B3197955", "USDT", "Tether USD", 18),
-      evmToken("bsc", 56, "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d", "USDC", "USD Coin", 18),
-      evmToken("bsc", 56, "0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56", "BUSD", "Binance USD", 18),
-      evmToken("bsc", 56, "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", "WBNB", "Wrapped BNB", 18),
+      ...verifiedDefaults("bsc", 56, ["USDT", "USDC", "BUSD", "WBNB"]),
     ];
   }
   return [];
+}
+
+function verifiedDefaults(chainKey: "ethereum" | "bsc", chainId: number, symbols: string[]): EcosystemToken[] {
+  return symbols.flatMap((symbol) => {
+    const token = VERIFIED_EVM_TOKENS.find((candidate) => candidate.network === chainKey && candidate.symbol === symbol);
+    return token ? [evmToken(chainKey, chainId, token.contract, token.symbol, token.name, token.decimals)] : [];
+  });
 }
 
 function nativeToken(chainKey: EcosystemChainKey, chainId: number, symbol: string, name: string): EcosystemToken {

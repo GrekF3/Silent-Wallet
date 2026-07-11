@@ -15,6 +15,7 @@ import type { ChainTx } from "@/lib/chains";
 import { findAddressBookContact } from "@/lib/addressBook/storage";
 import { TransactionNotes } from "@/components/transactions/TransactionNotes";
 import { useI18n } from "@/lib/i18n";
+import { isHiddenUnverifiedIncoming, transactionVerification } from "@/lib/tokenVerification";
 
 type Filter = "all" | "send" | "receive";
 const FILTERS: { id: Filter; label: string }[] = [
@@ -68,6 +69,7 @@ function TxDetailsModal({ tx, onClose }: { tx: ChainTx; onClose: () => void }) {
   const value = tx.amountUSD > 0.001 ? formatUSD(tx.amountUSD) : t("Value unavailable");
   const fromContact = findAddressBookContact(tx.from, chain);
   const toContact = findAddressBookContact(tx.to, chain);
+  const unverified = transactionVerification(tx) === "unverified";
 
   if (typeof document === "undefined") return null;
 
@@ -96,6 +98,7 @@ function TxDetailsModal({ tx, onClose }: { tx: ChainTx; onClose: () => void }) {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 18, fontWeight: 600, color: "#fff", marginBottom: 4 }}>{t(tx.type === "receive" ? "Received" : "Sent")} {tx.asset}</div>
               <div style={{ fontSize: 12, color: "rgba(255,255,255,0.32)", textTransform: "uppercase", letterSpacing: "0.08em" }}>{chain} · {tx.status}</div>
+              {unverified && <div style={{ marginTop: 6, display: "inline-flex", padding: "3px 8px", borderRadius: 7, border: "1px solid rgba(251,191,36,0.22)", background: "rgba(251,191,36,0.08)", color: "rgba(251,191,36,0.86)", fontSize: 10, fontWeight: 650 }}>{t("Unverified token")}</div>}
             </div>
             <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.05)", cursor: "pointer" }}>
               <Icons.x size={15} color="rgba(255,255,255,0.55)" />
@@ -128,14 +131,21 @@ function TxDetailsModal({ tx, onClose }: { tx: ChainTx; onClose: () => void }) {
 
 export function HistoryView() {
   const { t } = useI18n();
-  const { transactions, historyFilter, setFilter, loadingState } = useWalletStore();
+  const { transactions, historyFilter, setFilter, loadingState, verifiedHistoryOnly } = useWalletStore();
   const [selectedTx, setSelectedTx] = useState<ChainTx | null>(null);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [showUnverified, setShowUnverified] = useState(false);
   const historyLoading = loadingState.transactions.status === "loading" || loadingState.transactions.status === "refreshing";
 
-  const filtered = historyFilter === "all"
+  const directionFiltered = historyFilter === "all"
     ? transactions
     : transactions.filter((t) => t.type === historyFilter);
+  const hiddenCount = verifiedHistoryOnly
+    ? directionFiltered.filter((tx) => isHiddenUnverifiedIncoming(tx, true)).length
+    : 0;
+  const filtered = verifiedHistoryOnly && !showUnverified
+    ? directionFiltered.filter((tx) => !isHiddenUnverifiedIncoming(tx, true))
+    : directionFiltered;
   const visible = filtered.slice(0, visibleCount);
   const hasMore = visible.length < filtered.length;
 
@@ -179,6 +189,18 @@ export function HistoryView() {
           </button>
         </div>
       </div>
+
+      {hiddenCount > 0 && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "11px 14px", borderRadius: 14, border: "1px solid rgba(251,191,36,0.14)", background: "rgba(251,191,36,0.045)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0, fontSize: 12, color: "rgba(255,255,255,0.42)" }}>
+            <Icons.shield size={14} color="rgba(251,191,36,0.68)" />
+            <span>{showUnverified ? t("Unverified token activity is visible.") : `${hiddenCount} ${t(hiddenCount === 1 ? "unverified token transfer hidden" : "unverified token transfers hidden")}`}</span>
+          </div>
+          <button type="button" onClick={() => { setShowUnverified((value) => !value); setVisibleCount(PAGE_SIZE); }} style={{ flexShrink: 0, border: "none", background: "transparent", color: "rgba(251,191,36,0.82)", fontFamily: "inherit", fontSize: 12, fontWeight: 650, cursor: "pointer", padding: 4 }}>
+            {t(showUnverified ? "Hide unverified" : "Show hidden")}
+          </button>
+        </div>
+      )}
 
       {/* Filter tabs */}
       <div style={{ display: "flex", padding: 3, borderRadius: 14, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", alignSelf: "flex-start" }}>
@@ -262,6 +284,9 @@ export function HistoryView() {
                           )}
                           {tx.status === "failed" && (
                             <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 6, background: "rgba(255,60,60,0.08)", border: "1px solid rgba(255,60,60,0.18)", color: "rgba(255,100,100,0.80)", fontWeight: 500 }}>{t("Failed")}</span>
+                          )}
+                          {transactionVerification(tx) === "unverified" && (
+                            <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 6, background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.20)", color: "rgba(251,191,36,0.80)", fontWeight: 500 }}>{t("Unverified token")}</span>
                           )}
                         </div>
                         <div style={{ fontSize: 11, fontFamily: "monospace", color: "rgba(255,255,255,0.22)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>

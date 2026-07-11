@@ -1,6 +1,7 @@
 // ERC-20 / BEP-20 token balance discovery + pricing
 import { rpcUrl, coinGeckoHeaders } from "./config";
 import { dataProxyFetch, dataProxyPath } from "./api";
+import { VERIFIED_EVM_TOKENS, type VerifiedEvmToken } from "./tokenVerification";
 
 export type EvmToken = {
   contract:  string;
@@ -75,28 +76,9 @@ async function fetchEthTokens(address: string): Promise<EvmToken[]> {
 }
 
 // ── Popular BEP-20 tokens on BSC ─────────────────────────────────
-const BSC_TOKENS: { contract: string; symbol: string; name: string; decimals: number; cgId: string }[] = [
-  { contract: "0x55d398326f99059fF775485246999027B3197955", symbol: "USDT",  name: "Tether USD",         decimals: 18, cgId: "tether" },
-  { contract: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d", symbol: "USDC",  name: "USD Coin",           decimals: 18, cgId: "usd-coin" },
-  { contract: "0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56", symbol: "BUSD",  name: "Binance USD",        decimals: 18, cgId: "binance-usd" },
-  { contract: "0x1AF3F329e8BE154074D8769D1FFa4eE058B1DBc3", symbol: "DAI",   name: "Dai Stablecoin",     decimals: 18, cgId: "dai" },
-  { contract: "0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82", symbol: "CAKE",  name: "PancakeSwap",        decimals: 18, cgId: "pancakeswap-token" },
-  { contract: "0x2170Ed0880ac9A755fd29B2688956BD959F933F8", symbol: "ETH",   name: "Ethereum (BEP-20)",  decimals: 18, cgId: "ethereum" },
-  { contract: "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c", symbol: "BTCB",  name: "Bitcoin BEP-20",     decimals: 18, cgId: "bitcoin" },
-  { contract: "0x3EE2200Efb3400fAbB9AacF31297cBdD1d435D47", symbol: "ADA",   name: "Cardano (BEP-20)",   decimals: 18, cgId: "cardano" },
-  { contract: "0x7083609fCE4d1d8Dc0C979AAb8c869Ea2C873402", symbol: "DOT",   name: "Polkadot (BEP-20)",  decimals: 18, cgId: "polkadot" },
-  { contract: "0xF8A0BF9cF54Bb92F17374d9e9A321E6a111a51bD", symbol: "LINK",  name: "ChainLink (BEP-20)", decimals: 18, cgId: "chainlink" },
-  { contract: "0xCC42724C6683B7E57334c4E856f4c9965ED682bD", symbol: "MATIC", name: "Polygon (BEP-20)",    decimals: 18, cgId: "matic-network" },
-  { contract: "0x1CE0c2827e2ef14D5C4f29a091d735A204794041", symbol: "AVAX",  name: "Avalanche (BEP-20)", decimals: 18, cgId: "avalanche-2" },
-  { contract: "0x570A5D26f7765Ecb712C0924E4De545B89fD43dF", symbol: "SOL",   name: "Solana (BEP-20)",    decimals: 18, cgId: "solana" },
-  { contract: "0x1D2F0da169ceB9fC7B3144628dB156f3F6c60dBE", symbol: "XRP",   name: "XRP (BEP-20)",       decimals: 18, cgId: "ripple" },
-  { contract: "0xCE7de646e7208a4Ef112cb6ed5038FA6cC6b12e3", symbol: "TRX",   name: "TRON (BEP-20)",      decimals: 6,  cgId: "tron" },
-  { contract: "0x2859e4544C4bB03966803b044A93563Bd2D0DD4D", symbol: "SHIB",  name: "Shiba Inu (BEP-20)", decimals: 18, cgId: "shiba-inu" },
-  { contract: "0xBf5140A22578168FD562DCcF235E5D43A02ce9B1", symbol: "UNI",   name: "Uniswap (BEP-20)",   decimals: 18, cgId: "uniswap" },
-  { contract: "0x85EAC5Ac2F758618Dfa09bDbe0cf174e7d574D5B", symbol: "TWT",   name: "Trust Wallet Token", decimals: 18, cgId: "trust-wallet-token" },
-  { contract: "0xfb6115445Bff7b52FeB98650C87f44907E58f802", symbol: "AAVE",  name: "Aave (BEP-20)",      decimals: 18, cgId: "aave" },
-  { contract: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", symbol: "WBNB",  name: "Wrapped BNB",        decimals: 18, cgId: "wbnb" },
-];
+const BSC_TOKENS = VERIFIED_EVM_TOKENS.filter(
+  (token): token is VerifiedEvmToken & { cgId: string } => token.network === "bsc" && !!token.cgId,
+);
 
 const BALANCE_OF = (addr: string) => "0x70a08231" + addr.slice(2).padStart(64, "0");
 

@@ -54,6 +54,7 @@ export type ChainTx = {
   tokenContract?: string;
   network?:   "ethereum" | "bsc" | "bitcoin" | "solana";
   id?:       string;
+  verification?: "native" | "verified" | "unverified";
 };
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.7
+
+- Added verified-token history filtering, enabled by default, to hide unknown incoming token spam without removing it.
+- Added a hidden-activity counter, temporary reveal controls, and clear unverified-token warnings.
+- Kept unknown outgoing transactions visible and protected USD values from spoofed stablecoin symbols by verifying network and contract.
+- Applied visible-history filtering to the dashboard, asset activity, and CSV exports.
+
 ## 0.1.6
 
 - Added English and Russian interface switching with the language preference saved on-device.

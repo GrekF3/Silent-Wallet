@@ -9,12 +9,14 @@ import { accountsToCsv, addressBookToCsv, downloadCsv, portfolioToCsv, transacti
 import { usePremium } from "@/lib/premium/entitlements";
 import { useWalletStore } from "@/lib/store";
 import { LockedFeature } from "@/components/premium/LockedFeature";
+import { visibleHistoryTransactions } from "@/lib/tokenVerification";
 
 export function ExportPanel() {
   const premium = usePremium();
   const contacts = useAddressBook();
   const accounts = useWalletAccounts();
-  const { transactions, assets } = useWalletStore();
+  const { transactions, assets, verifiedHistoryOnly } = useWalletStore();
+  const visibleTransactions = visibleHistoryTransactions(transactions, verifiedHistoryOnly);
 
   if (!premium.hasEntitlement("pro.exports.csv")) {
     return <LockedFeature entitlement="pro.exports.csv" title="CSV export" description="Export address book, visible history, and portfolio snapshots without private keys." />;
@@ -31,7 +33,7 @@ export function ExportPanel() {
         <GlassButton variant="default" size="md" onClick={() => downloadCsv("silent-address-book.csv", addressBookToCsv(contacts))}>
           <Icons.download size={13} /> Address book
         </GlassButton>
-        <GlassButton variant="default" size="md" onClick={() => downloadCsv("silent-transactions.csv", transactionsToCsv(transactions))}>
+        <GlassButton variant="default" size="md" onClick={() => downloadCsv("silent-transactions.csv", transactionsToCsv(visibleTransactions))}>
           <Icons.download size={13} /> History
         </GlassButton>
         <GlassButton variant="default" size="md" onClick={() => downloadCsv("silent-portfolio.csv", portfolioToCsv(assets))}>

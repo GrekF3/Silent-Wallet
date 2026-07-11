@@ -49,3 +49,5 @@ next-env.d.ts
 # Build cache
 .next-cache/
 __pycache__/
+/src-tauri/target/
+/src-tauri/gen/
