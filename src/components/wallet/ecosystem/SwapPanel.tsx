@@ -44,6 +44,13 @@ function rawAmount(amount: string, token: EcosystemToken) {
   return parseUnits(amount, token.decimals).toString();
 }
 
+function quoteMovedMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("0x97a6f3b9") || message.includes("TooMuchSlippage")
+    ? "Quote moved before execution. Get a fresh quote or increase slippage, then try again."
+    : error instanceof Error ? error.message : "Swap failed";
+}
+
 function QuoteSkeleton() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 14, borderRadius: 16, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
@@ -101,6 +108,21 @@ export function SwapPanel({
         ? "No EVM address is available."
         : "";
   const watchOnly = sessionMode === "watch";
+  const quoteMismatchReason = useMemo(() => {
+    if (!quote || !fromToken || !toToken || !taker) return "";
+    let currentSellAmount = "";
+    try {
+      currentSellAmount = rawAmount(amount, fromToken);
+    } catch {
+      return "Quote no longer matches the current amount.";
+    }
+    if (quote.chainId !== chainId) return "Quote no longer matches the selected chain.";
+    if (quote.sellToken.toLowerCase() !== toZeroXTokenAddress(fromToken).toLowerCase()) return "Quote no longer matches the from asset.";
+    if (quote.buyToken.toLowerCase() !== toZeroXTokenAddress(toToken).toLowerCase()) return "Quote no longer matches the to asset.";
+    if (quote.sellAmount !== currentSellAmount) return "Quote no longer matches the current amount.";
+    if (quote.taker && quote.taker.toLowerCase() !== taker.toLowerCase()) return "Quote was created for another active address. Get a new quote.";
+    return "";
+  }, [amount, chainId, fromToken, quote, taker, toToken]);
 
   const clearQuote = () => {
     setQuote(null);
@@ -150,7 +172,7 @@ export function SwapPanel({
   };
 
   const approve = async () => {
-    if (!quote?.allowanceTarget || !mnemonic || !fromToken) return;
+    if (!quote?.allowanceTarget || !mnemonic || !fromToken || quoteMismatchReason) return;
     setApproving(true);
     setExec({ status: "pending", label: "Approve exact token allowance in your wallet" });
     try {
@@ -176,6 +198,10 @@ export function SwapPanel({
 
   const execute = async () => {
     if (!quote || !mnemonic) return;
+    if (quoteMismatchReason) {
+      setExec({ status: "error", error: quoteMismatchReason });
+      return;
+    }
     setExecuting(true);
     setExec({ status: "pending", label: "Sign swap transaction locally" });
     try {
@@ -184,7 +210,7 @@ export function SwapPanel({
       await logRevenueEvent({ provider: "0x", action: "execute", chain: String(chainId), tokenSymbols: [fromToken.symbol, toToken.symbol], feeBps: config?.defaultSwapFeeBps, quoteId: quote.quoteId, txHash: hash });
       toast("Swap submitted");
     } catch (error) {
-      setExec({ status: "error", error: error instanceof Error ? error.message : "Swap failed" });
+      setExec({ status: "error", error: quoteMovedMessage(error) });
     } finally {
       setExecuting(false);
     }
@@ -246,16 +272,21 @@ export function SwapPanel({
           rows={[
             { label: "You pay", value: `${amount} ${fromToken.symbol}` },
             { label: "You receive", value: quote.buyAmount ? `${formatRawAmount(quote.buyAmount, toToken.decimals)} ${toToken.symbol}` : "Quoted by provider" },
-            { label: "Provider", value: "0x Swap API" },
           ]}
         >
+          {quoteMismatchReason && (
+            <div style={{ display: "flex", gap: 8, padding: "10px 12px", marginBottom: 10, borderRadius: 13, border: "1px solid rgba(251,191,36,0.18)", background: "rgba(251,191,36,0.06)" }}>
+              <Icons.info size={14} color="rgba(251,191,36,0.78)" />
+              <span style={{ fontSize: 12, color: "rgba(251,210,120,0.74)" }}>{quoteMismatchReason}</span>
+            </div>
+          )}
           <div style={{ display: "grid", gridTemplateColumns: allowanceNeeded ? "1fr 1fr" : "1fr", gap: 10 }}>
             {allowanceNeeded && (
-              <GlassButton variant="default" size="lg" onClick={approve} disabled={approving || watchOnly || !mnemonic}>
+              <GlassButton variant="default" size="lg" onClick={approve} disabled={approving || watchOnly || !mnemonic || !!quoteMismatchReason}>
                 {approving ? "Approving..." : "Approve exact amount"}
               </GlassButton>
             )}
-            <GlassButton variant="primary" size="lg" onClick={execute} disabled={executing || watchOnly || !mnemonic || allowanceNeeded || !quote.transaction}>
+            <GlassButton variant="primary" size="lg" onClick={execute} disabled={executing || watchOnly || !mnemonic || allowanceNeeded || !quote.transaction || !!quoteMismatchReason}>
               {executing ? "Signing..." : "Confirm swap"}
             </GlassButton>
           </div>

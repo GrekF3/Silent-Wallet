@@ -133,6 +133,9 @@ function normalizeZeroX(raw: Record<string, unknown>, request: SwapQuoteRequest)
     label: "0x fee",
     provider: "0x",
     fee: asRecord(raw.fees)?.zeroExFee,
+    fallbackToken: request.buyTokenSymbol,
+    fallbackTokenAddress: request.buyToken,
+    fallbackDecimals: request.buyTokenDecimals,
   });
   const gasFee = feeFromProviderObject({
     label: "Estimated gas",
@@ -158,6 +161,7 @@ function normalizeZeroX(raw: Record<string, unknown>, request: SwapQuoteRequest)
     sellToken: request.sellToken,
     buyToken: request.buyToken,
     sellAmount: request.sellAmount,
+    taker: request.taker,
     buyAmount: stringField(raw.buyAmount),
     price: stringField(raw.price),
     guaranteedPrice: stringField(raw.guaranteedPrice),

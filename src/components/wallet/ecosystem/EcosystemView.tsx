@@ -217,7 +217,7 @@ export function EcosystemView() {
         ) : (
           <>
             {ecosystemTab === "ramp" && <RampPanel config={config} tokens={tokens} addresses={addresses} />}
-            {ecosystemTab === "swap" && <SwapPanel config={config} tokens={tokens} addresses={addresses} mnemonic={mnemonic} accountIndex={activeAccountIndex} addressIndexes={activeAddressIndexes} sessionMode={sessionMode} network={network} />}
+            {ecosystemTab === "swap" && <SwapPanel key={`swap-${activeAccountIndex}-${activeAddressIndexes.ethereum}-${activeAddressIndexes.bsc}-${addresses?.ethereum ?? ""}-${addresses?.bsc ?? ""}`} config={config} tokens={tokens} addresses={addresses} mnemonic={mnemonic} accountIndex={activeAccountIndex} addressIndexes={activeAddressIndexes} sessionMode={sessionMode} network={network} />}
             {ecosystemTab === "bridge" && <BridgePanel config={config} tokens={tokens} addresses={addresses} mnemonic={mnemonic} accountIndex={activeAccountIndex} addressIndexes={activeAddressIndexes} sessionMode={sessionMode} network={network} />}
           </>
         )}

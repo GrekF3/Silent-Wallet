@@ -101,7 +101,7 @@ export type SwapQuoteRequest = {
   sellToken: string;
   buyToken: string;
   sellAmount: string;
-  taker: string;
+  taker: `0x${string}`;
   slippageBps?: number;
   feeBps?: number;
   swapFeeToken?: string;
@@ -117,6 +117,7 @@ export type SwapQuoteResponse = {
   sellToken: string;
   buyToken: string;
   sellAmount: string;
+  taker?: `0x${string}`;
   buyAmount?: string;
   price?: string;
   guaranteedPrice?: string;

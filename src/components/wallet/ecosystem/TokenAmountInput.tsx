@@ -37,6 +37,7 @@ export function TokenAmountInput({
           value={amount}
           disabled={disabled}
           onChange={(e) => onAmountChange(e.target.value)}
+          style={{ height: 56, borderRadius: 16 }}
         />
         {selected.balance !== undefined && (
           <button
