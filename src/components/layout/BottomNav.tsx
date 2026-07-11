@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { Icons } from "@/components/ui/Icon";
 import { useWalletStore, type View } from "@/lib/store";
+import { useI18n } from "@/lib/i18n";
 
 type NavItem = {
   id: View;
@@ -20,12 +21,13 @@ const NAV: NavItem[] = [
 ];
 
 export function BottomNav() {
+  const { t } = useI18n();
   const { view, setView, sessionMode } = useWalletStore();
   const activeNav = (view === "asset" ? "dashboard" : view === "addressBook" ? "accounts" : view === "learn" ? "ecosystem" : view) as View;
   const items = sessionMode === "watch" ? NAV.filter((item) => item.id !== "transfer") : NAV;
 
   return (
-    <nav className="bottom-nav" aria-label="Primary mobile navigation">
+    <nav className="bottom-nav" aria-label={t("Primary mobile navigation")}>
       {items.map((item) => {
         const Icon = Icons[item.icon];
         const active = activeNav === item.id;
@@ -46,7 +48,7 @@ export function BottomNav() {
               />
             )}
             <Icon size={18} />
-            <span>{item.label}</span>
+            <span>{t(item.label)}</span>
           </button>
         );
       })}

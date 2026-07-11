@@ -20,6 +20,7 @@ import type { SessionMode } from "@/lib/session";
 import { TokenAmountInput } from "./TokenAmountInput";
 import { EcosystemTokenPicker } from "./EcosystemTokenPicker";
 import { QuoteReview } from "./QuoteReview";
+import { useI18n } from "@/lib/i18n";
 import { ExecutionStatus, type ExecutionState } from "./ExecutionStatus";
 import { ProviderBadge } from "./ProviderBadge";
 import { HelpTooltip } from "./HelpTooltip";
@@ -81,6 +82,7 @@ export function SwapPanel({
   sessionMode: SessionMode;
   network: Network;
 }) {
+  const { t } = useI18n();
   const toast = useToast();
   const [chainId, setChainId] = useState<1 | 56>(1);
   const chainTokens = useMemo(() => mergeTokens(tokens, chainId), [tokens, chainId]);
@@ -217,14 +219,14 @@ export function SwapPanel({
   };
 
   if (!fromToken || !toToken) {
-    return <div style={{ padding: 28, color: "rgba(255,255,255,0.30)", textAlign: "center" }}>No EVM assets are available for swaps.</div>;
+    return <div style={{ padding: 28, color: "rgba(255,255,255,0.30)", textAlign: "center" }}>{t("No EVM assets are available for swaps.")}</div>;
   }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-          <div style={{ fontSize: 18, fontWeight: 650, color: "#fff" }}>Swap</div>
+          <div style={{ fontSize: 18, fontWeight: 650, color: "#fff" }}>{t("Swap")}</div>
           <HelpTooltip label="About swaps">
             Same-chain EVM swaps use 0x quotes. Approvals and swaps are signed locally; Silent Wallet never sends your private key to the server.
           </HelpTooltip>
@@ -250,7 +252,7 @@ export function SwapPanel({
       {watchOnly && (
         <div style={{ display: "flex", gap: 9, padding: "12px 14px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.045)" }}>
           <Icons.lock size={15} color="rgba(255,255,255,0.46)" />
-          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.42)" }}>Observer mode cannot sign transactions.</span>
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.42)" }}>{t("Observer mode cannot sign transactions.")}</span>
         </div>
       )}
 

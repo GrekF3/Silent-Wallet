@@ -10,10 +10,12 @@ import { hasWallet } from "@/lib/storage";
 import { readSession } from "@/lib/session";
 import { useWalletStore } from "@/lib/store";
 import { hasCompletedOnboarding } from "@/lib/userExperience/mode";
+import { useI18n } from "@/lib/i18n";
 
 type Screen = "loading" | "onboarding" | "setup" | "lock" | "app";
 
 export default function Home() {
+  const { t } = useI18n();
   const { addresses, setSession, setWatchSession } = useWalletStore();
   const [screen, setScreen] = useState<Screen>("loading");
 
@@ -43,7 +45,7 @@ export default function Home() {
   }, [addresses, setSession, setWatchSession]);
 
   if (screen === "loading") {
-    return <AppPreloader label="Opening wallet" />;
+    return <AppPreloader label={t("Opening wallet")} />;
   }
 
   return (

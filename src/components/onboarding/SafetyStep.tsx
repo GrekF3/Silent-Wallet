@@ -2,8 +2,10 @@
 
 import { Icons } from "@/components/ui/Icon";
 import { OnboardingStep } from "./OnboardingStep";
+import { useI18n } from "@/lib/i18n";
 
 export function SafetyStep() {
+  const { t } = useI18n();
   return (
     <OnboardingStep
       label="Safety"
@@ -18,7 +20,7 @@ export function SafetyStep() {
         ].map((text) => (
           <div key={text} style={{ display: "flex", gap: 10, padding: "10px 12px", borderRadius: 12, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.50)", fontSize: 13 }}>
             <Icons.shield size={14} color="rgba(255,255,255,0.46)" />
-            <span>{text}</span>
+            <span>{t(text)}</span>
           </div>
         ))}
       </div>

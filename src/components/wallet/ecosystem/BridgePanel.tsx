@@ -20,6 +20,7 @@ import type { SessionMode } from "@/lib/session";
 import { TokenAmountInput } from "./TokenAmountInput";
 import { EcosystemTokenPicker } from "./EcosystemTokenPicker";
 import { QuoteReview } from "./QuoteReview";
+import { useI18n } from "@/lib/i18n";
 import { ExecutionStatus, type ExecutionState } from "./ExecutionStatus";
 import { ProviderBadge } from "./ProviderBadge";
 import { HelpTooltip } from "./HelpTooltip";
@@ -95,6 +96,7 @@ export function BridgePanel({
   sessionMode: SessionMode;
   network: Network;
 }) {
+  const { t } = useI18n();
   const toast = useToast();
   const [fromChainId, setFromChainId] = useState<1 | 56>(1);
   const [toChainId, setToChainId] = useState<1 | 56>(56);
@@ -234,14 +236,14 @@ export function BridgePanel({
   };
 
   if (!fromToken || !toToken) {
-    return <div style={{ padding: 28, color: "rgba(255,255,255,0.30)", textAlign: "center" }}>No EVM assets are available for bridge routes.</div>;
+    return <div style={{ padding: 28, color: "rgba(255,255,255,0.30)", textAlign: "center" }}>{t("No EVM assets are available for bridge routes.")}</div>;
   }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-          <div style={{ fontSize: 18, fontWeight: 650, color: "#fff" }}>Bridge</div>
+          <div style={{ fontSize: 18, fontWeight: 650, color: "#fff" }}>{t("Bridge")}</div>
           <HelpTooltip label="About bridges">
             LI.FI finds EVM bridge routes. Silent Wallet signs only supported local EVM transactions; BTC and Solana bridge execution stays disabled until safe local signing is ready.
           </HelpTooltip>
@@ -270,7 +272,7 @@ export function BridgePanel({
       {watchOnly && (
         <div style={{ display: "flex", gap: 9, padding: "12px 14px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.045)" }}>
           <Icons.lock size={15} color="rgba(255,255,255,0.46)" />
-          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.42)" }}>Observer mode cannot sign transactions.</span>
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.42)" }}>{t("Observer mode cannot sign transactions.")}</span>
         </div>
       )}
 

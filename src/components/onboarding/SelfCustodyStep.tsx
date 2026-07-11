@@ -2,8 +2,10 @@
 
 import { Icons } from "@/components/ui/Icon";
 import { OnboardingStep } from "./OnboardingStep";
+import { useI18n } from "@/lib/i18n";
 
 export function SelfCustodyStep() {
+  const { t } = useI18n();
   return (
     <OnboardingStep
       label="Self-custody"
@@ -17,7 +19,7 @@ export function SelfCustodyStep() {
           "You sign transactions locally.",
         ].map((text) => (
           <div key={text} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "rgba(255,255,255,0.54)" }}>
-            <Icons.check size={14} color="rgba(255,255,255,0.62)" /> {text}
+            <Icons.check size={14} color="rgba(255,255,255,0.62)" /> {t(text)}
           </div>
         ))}
       </div>

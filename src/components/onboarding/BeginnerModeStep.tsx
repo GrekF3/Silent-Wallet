@@ -4,6 +4,7 @@ import { GlassButton } from "@/components/ui/GlassButton";
 import { Icons } from "@/components/ui/Icon";
 import type { CryptoExperience } from "@/lib/userExperience/mode";
 import { OnboardingStep } from "./OnboardingStep";
+import { useI18n } from "@/lib/i18n";
 
 const OPTIONS: { value: CryptoExperience; title: string; body: string }[] = [
   { value: "new", title: "I'm new", body: "Show clearer explanations and stronger transaction prompts." },
@@ -18,6 +19,7 @@ export function BeginnerModeStep({
   value: CryptoExperience;
   onChange: (value: CryptoExperience) => void;
 }) {
+  const { t } = useI18n();
   return (
     <OnboardingStep
       label="Start"
@@ -38,15 +40,15 @@ export function BeginnerModeStep({
                 {active && <Icons.check size={13} color="#000" />}
               </span>
               <span style={{ minWidth: 0 }}>
-                <span style={{ display: "block", fontSize: 14, fontWeight: 650 }}>{option.title}</span>
-                <span style={{ display: "block", marginTop: 2, fontSize: 12, color: "rgba(255,255,255,0.34)" }}>{option.body}</span>
+                <span style={{ display: "block", fontSize: 14, fontWeight: 650 }}>{t(option.title)}</span>
+                <span style={{ display: "block", marginTop: 2, fontSize: 12, color: "rgba(255,255,255,0.34)" }}>{t(option.body)}</span>
               </span>
             </button>
           );
         })}
       </div>
       <GlassButton variant="default" size="md" onClick={() => onChange(value === "experienced" ? "new" : "experienced")}>
-        <Icons.eye size={13} /> Beginner Mode {value === "experienced" ? "off" : "on"}
+        <Icons.eye size={13} /> {t("Beginner Mode")} {t(value === "experienced" ? "off" : "on")}
       </GlassButton>
     </OnboardingStep>
   );

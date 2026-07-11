@@ -20,8 +20,16 @@ try {
 
   const result = spawnSync(
     process.platform === "win32" ? "npx.cmd" : "npx",
-    ["cross-env", "SILENT_APP_SHELL=1", "next", "build"],
-    { stdio: "inherit", shell: process.platform === "win32" }
+    ["next", "build"],
+    {
+      stdio: "inherit",
+      shell: process.platform === "win32",
+      env: {
+        ...process.env,
+        SILENT_APP_SHELL: "1",
+        NEXT_PUBLIC_DATA_PROXY_URL: process.env.NEXT_PUBLIC_DATA_PROXY_URL || "https://app.swallet.site",
+      },
+    }
   );
 
   if (result.error) {

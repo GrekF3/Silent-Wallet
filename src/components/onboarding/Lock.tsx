@@ -8,8 +8,10 @@ import { BrandLogo } from "@/components/ui/BrandLogo";
 import { loadMnemonic, deleteWallet } from "@/lib/storage";
 import { deriveAddresses } from "@/lib/wallet";
 import { useWalletStore }  from "@/lib/store";
+import { useI18n } from "@/lib/i18n";
 
 export function Lock({ onUnlock }: { onUnlock: () => void }) {
+  const { t } = useI18n();
   const { setSession } = useWalletStore();
   const [password, setPassword] = useState("");
   const [error,    setError]    = useState("");
@@ -25,14 +27,14 @@ export function Lock({ onUnlock }: { onUnlock: () => void }) {
       setSession(mnemonic, addresses);
       onUnlock();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Wrong password");
+      setError(e instanceof Error ? e.message : t("Wrong password"));
     } finally {
       setLoading(false);
     }
   };
 
   const reset = () => {
-    if (confirm("This will delete your wallet. Make sure you have your seed phrase backed up.")) {
+    if (confirm(t("This will delete your wallet. Make sure you have your seed phrase backed up."))) {
       deleteWallet();
       window.location.reload();
     }
@@ -49,15 +51,15 @@ export function Lock({ onUnlock }: { onUnlock: () => void }) {
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, marginBottom: 8 }}>
           <BrandLogo size={58} label="Silent Wallet" orientation="column" />
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.28)", marginTop: 4 }}>Enter password to unlock</div>
+            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.28)", marginTop: 4 }}>{t("Enter password to unlock")}</div>
           </div>
         </div>
 
         <GlassCard elevated style={{ padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
           <GlassInput
-            label="Password"
+            label={t("Password")}
             type="password"
-            placeholder="Your wallet password"
+            placeholder={t("Your wallet password")}
             value={password}
             onChange={(e) => { setPassword(e.target.value); setError(""); }}
             onKeyDown={(e) => e.key === "Enter" && unlock()}
@@ -69,7 +71,7 @@ export function Lock({ onUnlock }: { onUnlock: () => void }) {
             </div>
           )}
           <GlassButton variant="primary" size="lg" style={{ width: "100%" }} onClick={unlock} disabled={loading || !password}>
-            {loading ? "Unlocking…" : "Unlock"}
+            {t(loading ? "Unlocking…" : "Unlock")}
           </GlassButton>
         </GlassCard>
 
@@ -77,7 +79,7 @@ export function Lock({ onUnlock }: { onUnlock: () => void }) {
           onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,100,100,0.60)")}
           onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.22)")}
         >
-          Forgot password? Reset wallet
+          {t("Forgot password? Reset wallet")}
         </button>
       </motion.div>
     </div>

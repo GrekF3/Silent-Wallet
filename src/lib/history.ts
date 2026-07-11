@@ -3,7 +3,7 @@
 import type { ChainTx, Network } from "./chains";
 import type { Prices } from "./prices";
 import type { WalletAddresses } from "./wallet";
-import { dataProxyPath } from "./api";
+import { dataProxyFetch, dataProxyPath } from "./api";
 
 type ApiHistoryTx = Omit<ChainTx, "date"> & { date: string };
 
@@ -25,7 +25,7 @@ export async function fetchWalletHistory(
     solPrice: String(prices.SOL?.usd ?? 0),
   });
 
-  const r = await fetch(dataProxyPath(`/api/history?${params.toString()}`), {
+  const r = await dataProxyFetch(dataProxyPath(`/api/history?${params.toString()}`), {
     signal: AbortSignal.timeout(35_000),
     cache: "no-store",
   });

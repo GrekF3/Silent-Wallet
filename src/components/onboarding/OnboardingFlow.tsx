@@ -10,8 +10,10 @@ import { BeginnerModeStep } from "./BeginnerModeStep";
 import { SelfCustodyStep } from "./SelfCustodyStep";
 import { SafetyStep } from "./SafetyStep";
 import { FinishStep } from "./FinishStep";
+import { useI18n } from "@/lib/i18n";
 
 export function OnboardingFlow({ onDone }: { onDone: () => void }) {
+  const { t } = useI18n();
   const [step, setStep] = useState(0);
   const [experience, setExperience] = useState<CryptoExperience>("new");
   const steps = [
@@ -45,12 +47,12 @@ export function OnboardingFlow({ onDone }: { onDone: () => void }) {
         </AnimatePresence>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <button type="button" onClick={skip} style={{ border: "none", background: "transparent", color: "rgba(255,255,255,0.32)", font: "inherit", fontSize: 13, cursor: "pointer" }}>
-            Skip intro
+            {t("Skip intro")}
           </button>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {step > 0 && <GlassButton variant="ghost" size="md" onClick={() => setStep((value) => value - 1)}>Back</GlassButton>}
+            {step > 0 && <GlassButton variant="ghost" size="md" onClick={() => setStep((value) => value - 1)}>{t("Back")}</GlassButton>}
             <GlassButton variant="primary" size="md" onClick={() => step === steps.length - 1 ? finish() : setStep((value) => value + 1)}>
-              {step === steps.length - 1 ? "Start" : "Continue"} <Icons.chevronR size={13} color="#000" />
+              {t(step === steps.length - 1 ? "Start" : "Continue")} <Icons.chevronR size={13} color="#000" />
             </GlassButton>
           </div>
         </div>

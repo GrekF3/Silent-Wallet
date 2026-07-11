@@ -22,6 +22,7 @@ import { TransactionReview } from "@/components/wallet/TransactionReview";
 import { TransactionTemplates } from "@/components/transactions/TransactionTemplates";
 import { EmptyState } from "@/components/common/EmptyState";
 import { Skeleton, SkeletonPanel } from "@/components/common/Skeleton";
+import { useI18n } from "@/lib/i18n";
 import { createAccountAddressSlot, useAccountAddressSlots, useWalletAccounts } from "@/lib/accounts/storage";
 import type { AccountAddressNetwork, WalletAccount } from "@/lib/accounts/types";
 import { usePremium } from "@/lib/premium/entitlements";
@@ -108,6 +109,7 @@ function AssetPicker({ selected, assets, onSelect }: {
   assets:   PickAsset[];
   onSelect: (a: PickAsset) => void;
 }) {
+  const { t } = useI18n();
   const [open, setOpen]     = useState(false);
   const [search, setSearch] = useState("");
   const filtered = useMemo(() => {
@@ -119,7 +121,7 @@ function AssetPicker({ selected, assets, onSelect }: {
 
   return (
     <div style={{ position: "relative" }}>
-      <span style={S.label}>Asset & Network</span>
+      <span style={S.label}>{t("Asset & Network")}</span>
       <motion.button
         onClick={() => { setOpen(!open); setSearch(""); }}
         whileTap={{ scale: 0.98 }}
@@ -172,7 +174,7 @@ function AssetPicker({ selected, assets, onSelect }: {
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search…"
+                  placeholder={t("Search…")}
                   autoFocus
                   style={{ width: "100%", height: 36, padding: "0 12px", borderRadius: 10, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", color: "#fff", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 10 }}
                 />
@@ -206,7 +208,7 @@ function AssetPicker({ selected, assets, onSelect }: {
                 </div>
               ))}
               {filtered.length === 0 && (
-                <div style={{ padding: "20px 16px", fontSize: 13, color: "rgba(255,255,255,0.28)", textAlign: "center" }}>No assets found</div>
+                <div style={{ padding: "20px 16px", fontSize: 13, color: "rgba(255,255,255,0.28)", textAlign: "center" }}>{t("No assets found")}</div>
               )}
             </div>
           </motion.div>
@@ -218,6 +220,7 @@ function AssetPicker({ selected, assets, onSelect }: {
 
 /* ── Gas Estimate ────────────────────────────────────────────────── */
 function GasEstimate({ asset, network }: { asset: PickAsset; network: string }) {
+  const { t } = useI18n();
   const [fee, setFee] = useState<number | null>(null);
 
   useEffect(() => {
@@ -230,7 +233,7 @@ function GasEstimate({ asset, network }: { asset: PickAsset; network: string }) 
   }, [asset, network]);
 
   if (asset.network === "bitcoin" || asset.network === "solana") {
-    return <span style={{ fontSize: 12, color: "rgba(255,255,255,0.28)" }}>Network fee calculated on send</span>;
+    return <span style={{ fontSize: 12, color: "rgba(255,255,255,0.28)" }}>{t("Network fee calculated on send")}</span>;
   }
 
   return fee === null
@@ -361,6 +364,7 @@ function OwnAccountRecipients({
   activeNetwork: "mainnet" | "testnet";
   onSelect: (address: string, accountName: string) => void;
 }) {
+  const { t } = useI18n();
   const targets = useMemo(() => {
     if (!mnemonic) return [];
     return accounts
@@ -377,7 +381,7 @@ function OwnAccountRecipients({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: -8 }}>
-      <span style={{ ...S.label, marginBottom: 0 }}>Own accounts</span>
+      <span style={{ ...S.label, marginBottom: 0 }}>{t("Own accounts")}</span>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         {targets.slice(0, 5).map(({ account, address }) => (
           <button
@@ -433,6 +437,7 @@ function QRDisplay({ value }: { value: string }) {
 
 /* ── Tx Status Tracker ───────────────────────────────────────────── */
 function TxTracker({ hash, assetNetwork, network }: { hash: string; assetNetwork: string; network: string }) {
+  const { t } = useI18n();
   const [status, setStatus] = useState<TxStatus>("pending");
   const net = network as "mainnet" | "testnet";
   const explorerUrl = EXPLORERS[net]?.[assetNetwork] ?? "";
@@ -483,11 +488,11 @@ function TxTracker({ hash, assetNetwork, network }: { hash: string; assetNetwork
         <span style={{ fontSize: 11, fontFamily: "monospace", color: "rgba(255,255,255,0.35)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {hash.slice(0, 20)}…{hash.slice(-10)}
         </span>
-        <button onClick={() => navigator.clipboard.writeText(hash)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.35)", display: "flex", padding: 2 }} title="Copy hash">
+        <button onClick={() => navigator.clipboard.writeText(hash)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.35)", display: "flex", padding: 2 }} title={t("Copy hash")}>
           <Icons.copy size={13} />
         </button>
         {explorerUrl && (
-          <a href={`${explorerUrl}${hash}`} target="_blank" rel="noopener noreferrer" style={{ color: "rgba(255,255,255,0.35)", display: "flex" }} title="View on explorer">
+          <a href={`${explorerUrl}${hash}`} target="_blank" rel="noopener noreferrer" style={{ color: "rgba(255,255,255,0.35)", display: "flex" }} title={t("View on explorer")}>
             <Icons.externalLink size={13} />
           </a>
         )}
@@ -498,6 +503,7 @@ function TxTracker({ hash, assetNetwork, network }: { hash: string; assetNetwork
 
 /* ── MAIN ────────────────────────────────────────────────────────── */
 export function TransferView() {
+  const { t: tr } = useI18n();
   const { assets, evmTokens, splTokens, addresses, mnemonic, network, activeAccountIndex, activeAddressIndexes, setTxs, hiddenAssetIds, transferIntent, clearTransferIntent, transactions, loading: walletLoading, initialLoaded } = useWalletStore();
   const toast = useToast();
   const addressBook = useAddressBook();
@@ -665,8 +671,8 @@ export function TransferView() {
       ) : (
         <EmptyState
           icon="wallet"
-          title="No transferable assets"
-          body="Receive crypto or switch to another account before starting a transfer."
+          title={tr("No transferable assets")}
+          body={tr("Receive crypto or switch to another account before starting a transfer.")}
         />
       )}
     </motion.div>
@@ -685,7 +691,7 @@ export function TransferView() {
           </svg>
         </div>
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 26, fontWeight: 300, color: "#fff", letterSpacing: "-0.015em", marginBottom: 6 }}>Sent</div>
+          <div style={{ fontSize: 26, fontWeight: 300, color: "#fff", letterSpacing: "-0.015em", marginBottom: 6 }}>{tr("Sent")}</div>
           <div style={{ fontSize: 15, color: "rgba(255,255,255,0.50)", fontVariantNumeric: "tabular-nums" }}>
             {amount} {asset.symbol}{amountUSD > 0 ? ` · ${formatUSD(amountUSD)}` : ""}
           </div>
@@ -694,7 +700,7 @@ export function TransferView() {
           <TxTracker hash={txHash} assetNetwork={asset.network} network={network} />
         </GlassCard>
         <GlassButton variant="default" size="lg" style={{ width: "100%" }} onClick={() => { setStep("form"); setAmount(""); setToAddr(""); setTxHash(""); }}>
-          New Transfer
+          {tr("New Transfer")}
         </GlassButton>
       </motion.div>
     </div>
@@ -706,8 +712,8 @@ export function TransferView() {
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
         style={{ maxWidth: 420, width: "100%", display: "flex", flexDirection: "column", gap: 20 }}>
         <div>
-          <span style={S.label}>Confirm Transaction</span>
-          <div style={{ fontSize: 26, fontWeight: 300, color: "#fff", letterSpacing: "-0.015em" }}>Review & Send</div>
+          <span style={S.label}>{tr("Confirm Transaction")}</span>
+          <div style={{ fontSize: 26, fontWeight: 300, color: "#fff", letterSpacing: "-0.015em" }}>{tr("Review & Send")}</div>
         </div>
         <TransactionReview
           amount={amount}
@@ -735,14 +741,14 @@ export function TransferView() {
         {network === "testnet" && (
           <div style={{ display: "flex", gap: 8, padding: "10px 14px", borderRadius: 12, background: "rgba(251,191,36,0.07)", border: "1px solid rgba(251,191,36,0.20)" }}>
             <Icons.info size={14} color="rgba(251,191,36,0.80)" />
-            <span style={{ fontSize: 12, color: "rgba(251,191,36,0.75)" }}>You are on Testnet. No real funds will move.</span>
+            <span style={{ fontSize: 12, color: "rgba(251,191,36,0.75)" }}>{tr("You are on Testnet. No real funds will move.")}</span>
           </div>
         )}
         {error && <div style={{ fontSize: 13, color: "rgba(255,100,100,0.85)", padding: "10px 14px", borderRadius: 12, background: "rgba(255,60,60,0.07)", border: "1px solid rgba(255,60,60,0.18)" }}>{error}</div>}
         <div style={{ display: "flex", gap: 10 }}>
-          <GlassButton variant="ghost" size="lg" style={{ flex: 1 }} onClick={() => { setStep("form"); setError(""); }} disabled={loading}>Cancel</GlassButton>
+          <GlassButton variant="ghost" size="lg" style={{ flex: 1 }} onClick={() => { setStep("form"); setError(""); }} disabled={loading}>{tr("Cancel")}</GlassButton>
           <GlassButton variant="primary" size="lg" style={{ flex: 1 }} onClick={handleSend} disabled={loading}>
-            {loading ? "Signing…" : "Confirm & Send"}
+            {tr(loading ? "Signing…" : "Confirm & Send")}
           </GlassButton>
         </div>
       </motion.div>
@@ -757,8 +763,8 @@ export function TransferView() {
       {/* Title + Tab toggle */}
       <div className="view-title-row" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
         <div className="transfer-title-block">
-          <span style={S.label}>Wallet transfer</span>
-          <div style={{ fontSize: 30, fontWeight: 300, color: "#fff", letterSpacing: 0 }}>Transfer</div>
+          <span style={S.label}>{tr("Wallet transfer")}</span>
+          <div style={{ fontSize: 30, fontWeight: 300, color: "#fff", letterSpacing: 0 }}>{tr("Transfer")}</div>
         </div>
         <div className="transfer-tabs" style={{ display: "flex", padding: 3, borderRadius: 14, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", boxShadow: "inset 0 1px 4px rgba(0,0,0,0.3)" }}>
           {(["send","receive"] as Tab[]).map((t) => (
@@ -769,7 +775,7 @@ export function TransferView() {
               )}
               <button className="transfer-tab-button" onClick={() => switchTab(t)} style={{ position: "relative", zIndex: 1, padding: "7px 18px", borderRadius: 11, border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 500, color: tab === t ? "#fff" : "rgba(255,255,255,0.35)", transition: "color 0.15s", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
                 {t === "send" ? <Icons.send size={13} /> : <Icons.receive size={13} />}
-                {t.charAt(0).toUpperCase() + t.slice(1)}
+                {tr(t === "send" ? "Send" : "Receive")}
               </button>
             </div>
           ))}
@@ -787,7 +793,7 @@ export function TransferView() {
             style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
             <GlassInput
-              label="Recipient address"
+              label={tr("Recipient address")}
               placeholder={isEVM ? "0x…" : "bc1… or 1…"}
               value={toAddr}
               onChange={(e) => { setToAddr(e.target.value); setError(""); }}
@@ -822,7 +828,7 @@ export function TransferView() {
               </div>
             )}
             {toAddr.length > 5 && !isValidAddr && (
-              <div style={{ fontSize: 12, color: "rgba(255,100,100,0.75)", marginTop: -12 }}>Invalid address format</div>
+              <div style={{ fontSize: 12, color: "rgba(255,100,100,0.75)", marginTop: -12 }}>{tr("Invalid address format")}</div>
             )}
             {toAddr.length > 5 && isValidAddr && savedRecipient && (
               <div style={{ fontSize: 12, color: "rgba(255,255,255,0.38)", marginTop: -12 }}>
@@ -852,7 +858,7 @@ export function TransferView() {
             </div>
 
             <GlassButton variant="primary" size="lg" style={{ width: "100%" }} disabled={!isValid} onClick={goConfirm}>
-              Continue <Icons.chevronR size={14} color="#000" />
+              {tr("Continue")} <Icons.chevronR size={14} color="#000" />
             </GlassButton>
             <TransactionTemplates recipient={toAddr} assetSymbol={asset.symbol} network={NET_LABEL[asset.network]} onUse={(recipient) => setToAddr(recipient)} />
           </motion.div>
@@ -886,7 +892,7 @@ export function TransferView() {
 
                 <div className="receive-actions" style={{ display: "flex", gap: 10, width: "100%" }}>
                   <GlassButton variant="default" size="md" style={{ flex: 1 }} onClick={() => { navigator.clipboard.writeText(receiveAddr); toast(`${asset.symbol} address copied`); }}>
-                    <Icons.copy size={13} /> Copy
+                    <Icons.copy size={13} /> {tr("Copy")}
                   </GlassButton>
                   <GlassButton variant="ghost" size="md" style={{ flex: 1 }} onClick={async () => {
                     const data = { title: `${asset.symbol} address`, text: receiveAddr };
@@ -897,7 +903,7 @@ export function TransferView() {
                       toast(`${asset.symbol} address copied`);
                     }
                   }}>
-                    <Icons.share size={13} /> Share
+                    <Icons.share size={13} /> {tr("Share")}
                   </GlassButton>
                 </div>
               </div>
@@ -906,7 +912,7 @@ export function TransferView() {
 
             {network === "testnet" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "12px 16px", borderRadius: 12, background: "rgba(98,88,255,0.07)", border: "1px solid rgba(98,88,255,0.20)" }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(150,140,255,0.85)" }}>Testnet Faucets</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(150,140,255,0.85)" }}>{tr("Testnet Faucets")}</span>
                 <div style={{ display: "flex", gap: 8 }}>
                   {[
                     { label: "Sepolia ETH", url: "https://sepoliafaucet.com" },

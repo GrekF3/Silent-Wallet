@@ -12,6 +12,7 @@ import { useWalletStore } from "@/lib/store";
 import type { WalletAddresses } from "@/lib/wallet";
 import { useUserExperience } from "@/lib/userExperience/mode";
 import { discoverMnemonicAccounts } from "@/lib/accounts/discovery";
+import { useI18n } from "@/lib/i18n";
 
 type Tab  = "create" | "import" | "watch";
 type Step = "start" | "phrase" | "confirm" | "password";
@@ -53,6 +54,7 @@ function WordGrid({ words }: { words: string[] }) {
 }
 
 export function Setup({ onDone }: { onDone: () => void }) {
+  const { t } = useI18n();
   const { setSession, setWatchSession } = useWalletStore();
   const ux = useUserExperience();
   const [tab,      setTab]      = useState<Tab>("create");
@@ -77,15 +79,15 @@ export function Setup({ onDone }: { onDone: () => void }) {
 
   const handleImport = () => {
     const m = importInput.trim().toLowerCase();
-    if (!validateMnemonic(m)) { setError("Invalid mnemonic phrase"); return; }
+    if (!validateMnemonic(m)) { setError(t("Invalid mnemonic phrase")); return; }
     setMnemonic(m);
     setStep("password");
   };
 
   const handleSave = async () => {
     if (loading) return;
-    if (password.length < 8) { setError("Password must be at least 8 characters"); return; }
-    if (password !== password2) { setError("Passwords don't match"); return; }
+    if (password.length < 8) { setError(t("Password must be at least 8 characters")); return; }
+    if (password !== password2) { setError(t("Passwords don't match")); return; }
     setLoading(true);
     setError("");
     try {
@@ -95,7 +97,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
       if (tab === "import") void discoverMnemonicAccounts(mnemonic);
       onDone();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to save wallet");
+      setError(e instanceof Error ? e.message : t("Failed to save wallet"));
     } finally {
       setLoading(false);
     }
@@ -104,8 +106,8 @@ export function Setup({ onDone }: { onDone: () => void }) {
   const handleWatch = () => {
     const addresses = watchAddresses(watchAddress);
     const name = watchName.trim();
-    if (!name) { setError("Name is required"); return; }
-    if (!addresses) { setError("Enter a valid Ethereum, BNB Chain, Bitcoin, or Solana address"); return; }
+    if (!name) { setError(t("Name is required")); return; }
+    if (!addresses) { setError(t("Enter a valid Ethereum, BNB Chain, Bitcoin, or Solana address")); return; }
     setWatchSession(name, addresses);
     onDone();
   };
@@ -128,7 +130,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, marginBottom: 8 }}>
           <BrandLogo size={58} label="Silent Wallet" orientation="column" />
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.30)", marginTop: 4 }}>Secure · Private · Minimal</div>
+            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.30)", marginTop: 4 }}>{t("Secure · Private · Minimal")}</div>
           </div>
         </div>
 
@@ -139,18 +141,18 @@ export function Setup({ onDone }: { onDone: () => void }) {
             <motion.div key="start" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               {/* Tabs */}
               <div style={{ display: "flex", padding: 3, borderRadius: 14, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", marginBottom: 20 }}>
-                {(["create","import","watch"] as Tab[]).map((t) => {
-                  const active = tab === t;
+                {(["create","import","watch"] as Tab[]).map((tabId) => {
+                  const active = tab === tabId;
                   return (
-                    <div key={t} style={{ position: "relative", flex: 1 }}>
+                    <div key={tabId} style={{ position: "relative", flex: 1 }}>
                       {active && (
                         <motion.div layoutId="tab-pill" transition={{ type: "spring", stiffness: 420, damping: 36 }}
                           style={{ position: "absolute", inset: 0, borderRadius: 11, background: "rgba(255,255,255,0.09)", border: "1px solid rgba(255,255,255,0.14)", borderTop: "1px solid rgba(255,255,255,0.22)", boxShadow: "0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.10)" }}
                         />
                       )}
-                      <button onClick={() => { setTab(t); setError(""); }}
+                      <button onClick={() => { setTab(tabId); setError(""); }}
                         style={{ position: "relative", zIndex: 1, width: "100%", height: 40, borderRadius: 11, border: "none", background: "transparent", cursor: "pointer", fontSize: 14, fontWeight: 500, fontFamily: "inherit", color: active ? "#fff" : "rgba(255,255,255,0.35)", transition: "color 0.15s" }}>
-                        {t === "create" ? "Create" : t === "import" ? "Import" : "Observer"}
+                        {t(tabId === "create" ? "Create" : tabId === "import" ? "Import" : "Observer")}
                       </button>
                     </div>
                   );
@@ -163,12 +165,12 @@ export function Setup({ onDone }: { onDone: () => void }) {
                     <div style={{ display: "flex", gap: 14, padding: "16px 18px", borderRadius: 12, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
                       <Icons.shield size={18} color="rgba(255,255,255,0.50)" />
                       <p style={{ fontSize: 13, color: "rgba(255,255,255,0.50)", lineHeight: 1.5 }}>
-                        A new 12-word seed phrase will be generated. Write it down and keep it safe — it&apos;s the only way to recover your wallet.
-                        {ux.beginnerMode ? " Silent Wallet never sends it to a server." : ""}
+                        {t("A new 12-word seed phrase will be generated. Write it down and keep it safe — it's the only way to recover your wallet.")}
+                        {ux.beginnerMode ? ` ${t("Silent Wallet never sends it to a server.")}` : ""}
                       </p>
                     </div>
                     <GlassButton variant="primary" size="lg" style={{ width: "100%" }} onClick={handleCreate}>
-                      <Icons.plus size={15} color="#000" /> Generate Seed Phrase
+                      <Icons.plus size={15} color="#000" /> {t("Generate Seed Phrase")}
                     </GlassButton>
                   </>
                 ) : tab === "import" ? (
@@ -177,16 +179,16 @@ export function Setup({ onDone }: { onDone: () => void }) {
                       <div style={{ display: "flex", gap: 10, padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", marginBottom: 10 }}>
                         <Icons.shield size={15} color="rgba(255,255,255,0.48)" />
                         <p style={{ fontSize: 12, color: "rgba(255,255,255,0.44)", lineHeight: 1.5 }}>
-                          Import only on a device you trust. Silent Wallet uses the phrase locally to restore your wallet.
+                          {t("Import only on a device you trust. Silent Wallet uses the phrase locally to restore your wallet.")}
                         </p>
                       </div>
                       <label style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.30)" }}>
-                        Seed Phrase
+                        {t("Seed Phrase")}
                       </label>
                       <textarea
                         value={importInput}
                         onChange={(e) => { setImport(e.target.value); setError(""); }}
-                        placeholder="Enter your 12 or 24-word seed phrase..."
+                        placeholder={t("Enter your 12 or 24-word seed phrase...")}
                         style={{
                           width: "100%", minHeight: 96, padding: "12px 14px", borderRadius: 14,
                           background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.10)",
@@ -198,7 +200,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
                     </div>
                     {error && <div style={{ fontSize: 13, color: "rgba(255,100,100,0.80)", padding: "10px 14px", borderRadius: 10, background: "rgba(255,60,60,0.07)", border: "1px solid rgba(255,60,60,0.15)" }}>{error}</div>}
                     <GlassButton variant="primary" size="lg" style={{ width: "100%" }} onClick={handleImport} disabled={!importInput.trim()}>
-                      Import Wallet
+                      {t("Import Wallet")}
                     </GlassButton>
                   </>
                 ) : (
@@ -206,24 +208,24 @@ export function Setup({ onDone }: { onDone: () => void }) {
                     <div style={{ display: "flex", gap: 14, padding: "16px 18px", borderRadius: 12, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
                       <Icons.eye size={18} color="rgba(255,255,255,0.50)" />
                       <p style={{ fontSize: 13, color: "rgba(255,255,255,0.50)", lineHeight: 1.5 }}>
-                        Watch-only mode tracks balances, tokens, and history for an address. Sending is disabled because no private key is stored.
+                        {t("Watch-only mode tracks balances, tokens, and history for an address. Sending is disabled because no private key is stored.")}
                       </p>
                     </div>
                     <GlassInput
-                      label="Name"
-                      placeholder="Main account"
+                      label={t("Name")}
+                      placeholder={t("Main account")}
                       value={watchName}
                       onChange={(e) => { setWatchName(e.target.value); setError(""); }}
                     />
                     <GlassInput
-                      label="Address"
+                      label={t("Address")}
                       placeholder="0x…, bc1…, or Solana address"
                       value={watchAddress}
                       onChange={(e) => { setWatchAddress(e.target.value); setError(""); }}
                     />
                     {error && <div style={{ fontSize: 13, color: "rgba(255,100,100,0.80)", padding: "10px 14px", borderRadius: 10, background: "rgba(255,60,60,0.07)", border: "1px solid rgba(255,60,60,0.15)" }}>{error}</div>}
                     <GlassButton variant="primary" size="lg" style={{ width: "100%" }} onClick={handleWatch} disabled={!watchName.trim() || !watchAddress.trim()}>
-                      <Icons.eye size={15} color="#000" /> Start Watching
+                      <Icons.eye size={15} color="#000" /> {t("Start Watching")}
                     </GlassButton>
                   </>
                 )}
@@ -236,19 +238,19 @@ export function Setup({ onDone }: { onDone: () => void }) {
             <motion.div key="phrase" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
               style={{ display: "flex", flexDirection: "column", gap: 20 }}>
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 18, fontWeight: 500, color: "#fff", marginBottom: 6 }}>Your Seed Phrase</div>
-                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.35)" }}>Write these 12 words in order. Never share them.</div>
+                <div style={{ fontSize: 18, fontWeight: 500, color: "#fff", marginBottom: 6 }}>{t("Your Seed Phrase")}</div>
+                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.35)" }}>{t("Write these 12 words in order. Never share them.")}</div>
               </div>
               <GlassCard elevated style={{ padding: 20 }}>
                 <WordGrid words={words} />
                 <button onClick={copy} style={{ display: "flex", alignItems: "center", gap: 6, margin: "16px auto 0", padding: "8px 16px", borderRadius: 10, cursor: "pointer", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", color: copied ? "rgba(255,255,255,0.65)" : "rgba(255,255,255,0.35)", fontFamily: "inherit", fontSize: 13, transition: "color 0.15s" }}>
-                  <Icons.copy size={13} /> {copied ? "Copied!" : "Copy to clipboard"}
+                  <Icons.copy size={13} /> {t(copied ? "Copied!" : "Copy to clipboard")}
                 </button>
               </GlassCard>
               <div style={{ display: "flex", gap: 10 }}>
-                <GlassButton variant="ghost" size="lg" style={{ flex: 1 }} onClick={() => setStep("start")}>Back</GlassButton>
+                <GlassButton variant="ghost" size="lg" style={{ flex: 1 }} onClick={() => setStep("start")}>{t("Back")}</GlassButton>
                 <GlassButton variant="primary" size="lg" style={{ flex: 1 }} onClick={() => setStep("password")}>
-                  I&apos;ve saved it <Icons.chevronR size={14} color="#000" />
+                  {t("I've saved it")} <Icons.chevronR size={14} color="#000" />
                 </GlassButton>
               </div>
             </motion.div>
@@ -259,18 +261,18 @@ export function Setup({ onDone }: { onDone: () => void }) {
             <motion.div key="password" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
               style={{ display: "flex", flexDirection: "column", gap: 20 }}>
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 18, fontWeight: 500, color: "#fff", marginBottom: 6 }}>Set Password</div>
-                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.35)" }}>Encrypts your seed phrase locally.</div>
+                <div style={{ fontSize: 18, fontWeight: 500, color: "#fff", marginBottom: 6 }}>{t("Set Password")}</div>
+                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.35)" }}>{t("Encrypts your seed phrase locally.")}</div>
               </div>
               <GlassCard elevated style={{ padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
-                <GlassInput label="Password" type="password" placeholder="Min. 8 characters" value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }} />
-                <GlassInput label="Confirm password" type="password" placeholder="Repeat password" value={password2} onChange={(e) => { setPassword2(e.target.value); setError(""); }} />
+                <GlassInput label={t("Password")} type="password" placeholder={t("Min. 8 characters")} value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }} />
+                <GlassInput label={t("Confirm password")} type="password" placeholder={t("Repeat password")} value={password2} onChange={(e) => { setPassword2(e.target.value); setError(""); }} />
                 {error && <div style={{ fontSize: 13, color: "rgba(255,100,100,0.80)", padding: "10px 14px", borderRadius: 10, background: "rgba(255,60,60,0.07)", border: "1px solid rgba(255,60,60,0.15)" }}>{error}</div>}
               </GlassCard>
               <div style={{ display: "flex", gap: 10 }}>
-                <GlassButton variant="ghost" size="lg" style={{ flex: 1 }} onClick={() => setStep(tab === "import" ? "start" : "phrase")} disabled={loading}>Back</GlassButton>
+                <GlassButton variant="ghost" size="lg" style={{ flex: 1 }} onClick={() => setStep(tab === "import" ? "start" : "phrase")} disabled={loading}>{t("Back")}</GlassButton>
                 <GlassButton variant="primary" size="lg" style={{ flex: 1 }} onClick={handleSave} disabled={loading || !password || !password2}>
-                  {loading ? "Creating…" : "Create Wallet"}
+                  {t(loading ? "Creating…" : "Create Wallet")}
                 </GlassButton>
               </div>
             </motion.div>

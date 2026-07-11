@@ -12,6 +12,7 @@ import type { WalletAccount } from "@/lib/accounts/types";
 import { usePremium } from "@/lib/premium/entitlements";
 import { useWalletStore } from "@/lib/store";
 import { formatUSD } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n";
 
 function AccountRow({
   account,
@@ -30,6 +31,7 @@ function AccountRow({
   activeLoading: boolean;
   onUse: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <GlassCard hover style={{ padding: 14, borderRadius: 18, background: active ? "rgba(255,255,255,0.065)" : undefined }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -49,7 +51,7 @@ function AccountRow({
             <div style={{ marginTop: 7 }}><Skeleton width={92} height={10} radius={6} /></div>
           ) : (
             <div style={{ marginTop: 3, fontSize: 12, color: "rgba(255,255,255,0.32)" }}>
-              {active ? `${assetCount} ${assetCount === 1 ? "asset" : "assets"}` : locked ? "Silent Pro" : "Switch to view balances"}
+              {active ? `${assetCount} ${t(assetCount === 1 ? "asset" : "assets")}` : locked ? "Silent Pro" : t("Switch to view balances")}
             </div>
           )}
         </button>
@@ -64,7 +66,7 @@ function AccountRow({
               onClick={onUse}
               style={{ marginTop: 4, border: 0, background: "transparent", color: "rgba(255,255,255,0.42)", cursor: "pointer", font: "inherit", fontSize: 12 }}
             >
-              Use
+              {t("Use")}
             </button>
           )}
         </div>
@@ -80,6 +82,7 @@ function AddAccountModal({
   onClose: () => void;
   onCreate: (name: string) => void;
 }) {
+  const { t } = useI18n();
   const [name, setName] = useState("");
 
   return (
@@ -103,8 +106,8 @@ function AddAccountModal({
               <Icons.wallet size={17} color="rgba(255,255,255,0.62)" />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 17, fontWeight: 750, color: "#fff" }}>Add account</div>
-              <div style={{ marginTop: 2, fontSize: 12, color: "rgba(255,255,255,0.30)" }}>A new derived account starts with no visible balance.</div>
+              <div style={{ fontSize: 17, fontWeight: 750, color: "#fff" }}>{t("Add account")}</div>
+              <div style={{ marginTop: 2, fontSize: 12, color: "rgba(255,255,255,0.30)" }}>{t("A new derived account starts with no visible balance.")}</div>
             </div>
             <button type="button" onClick={onClose} style={{ width: 34, height: 34, borderRadius: 11, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
               <Icons.x size={15} color="rgba(255,255,255,0.52)" />
@@ -114,9 +117,9 @@ function AddAccountModal({
           <GlassInput value={name} onChange={(event) => setName(event.target.value)} placeholder="Treasury" autoFocus />
 
           <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-            <GlassButton variant="ghost" size="md" style={{ flex: 1 }} onClick={onClose}>Cancel</GlassButton>
+          <GlassButton variant="ghost" size="md" style={{ flex: 1 }} onClick={onClose}>{t("Cancel")}</GlassButton>
             <GlassButton variant="primary" size="md" style={{ flex: 1 }} onClick={() => onCreate(name)}>
-              <Icons.plus size={13} color="#000" /> Add
+              <Icons.plus size={13} color="#000" /> {t("Add")}
             </GlassButton>
           </div>
         </GlassCard>
@@ -126,6 +129,7 @@ function AddAccountModal({
 }
 
 export function AccountsView() {
+  const { t } = useI18n();
   const premium = usePremium();
   const accounts = useWalletAccounts();
   const {
@@ -187,11 +191,11 @@ export function AccountsView() {
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
         <div>
-          <span className="label">Accounts</span>
-          <div style={{ marginTop: 8, fontSize: 30, fontWeight: 300, color: "#fff", letterSpacing: 0 }}>Accounts</div>
+          <span className="label">{t("Accounts")}</span>
+          <div style={{ marginTop: 8, fontSize: 30, fontWeight: 300, color: "#fff", letterSpacing: 0 }}>{t("Accounts")}</div>
         </div>
         <GlassButton variant="primary" size="md" onClick={openAddAccount} disabled={sessionMode === "watch"}>
-          <Icons.plus size={13} color="#000" /> Add account
+          <Icons.plus size={13} color="#000" /> {t("Add account")}
         </GlassButton>
       </div>
 

@@ -1,4 +1,4 @@
-import { dataProxyPath } from "@/lib/api";
+import { dataProxyFetch, dataProxyPath } from "@/lib/api";
 import type { EcosystemConfigResponse, RevenueEvent } from "./types";
 
 async function parseResponse<T>(response: Response): Promise<T> {
@@ -13,7 +13,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
 }
 
 export async function ecosystemPost<T>(path: string, body: unknown): Promise<T> {
-  const response = await fetch(dataProxyPath(path), {
+  const response = await dataProxyFetch(dataProxyPath(path), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -22,7 +22,7 @@ export async function ecosystemPost<T>(path: string, body: unknown): Promise<T> 
 }
 
 export async function ecosystemGet<T>(path: string): Promise<T> {
-  const response = await fetch(dataProxyPath(path), { cache: "no-store" });
+  const response = await dataProxyFetch(dataProxyPath(path), { cache: "no-store" });
   return parseResponse<T>(response);
 }
 

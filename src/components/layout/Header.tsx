@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { useWalletStore, type View } from "@/lib/store";
 import { BrandLogo } from "@/components/ui/BrandLogo";
 import { AccountSelector } from "@/components/accounts/AccountSelector";
+import { useI18n } from "@/lib/i18n";
 
 type NavItem = { id: View; label: string };
 const NAV: NavItem[] = [
@@ -17,6 +18,7 @@ const NAV: NavItem[] = [
 ];
 
 export function Header() {
+  const { t } = useI18n();
   const { view, setView, addresses, sessionMode } = useWalletStore();
   const activeNav = (view === "asset" ? "dashboard" : view) as View;
   const navItems = sessionMode === "watch" ? NAV.filter((item) => item.id !== "transfer") : NAV;
@@ -41,12 +43,12 @@ export function Header() {
         onClick={() => setView("dashboard")}
         className="topbar-brand"
         style={{ display: "flex", alignItems: "center", cursor: "pointer", background: "none", border: "none", flexShrink: 0, padding: 0 }}
-        aria-label="Open Silent overview"
+        aria-label={t("Open Silent overview")}
       >
         <BrandLogo size={30} label="Silent" />
         {sessionMode === "watch" && (
           <span className="topbar-watch-badge" style={{ marginLeft: 9, padding: "2px 7px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.42)", fontSize: 10, fontWeight: 650 }}>
-            Watch
+            {t("Watch")}
           </span>
         )}
       </button>
@@ -81,7 +83,7 @@ export function Header() {
                   whiteSpace: "nowrap",
                 }}
               >
-                {item.label}
+                {t(item.label)}
               </button>
             </div>
           );

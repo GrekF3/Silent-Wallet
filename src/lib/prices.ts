@@ -1,4 +1,4 @@
-import { dataProxyPath } from "./api";
+import { dataProxyFetch, dataProxyPath } from "./api";
 
 export type CoinData = {
   usd:            number;
@@ -12,7 +12,7 @@ export type CoinData = {
 export type Prices = Record<string, CoinData>;
 
 export async function fetchPrices(): Promise<Prices> {
-  const r = await fetch(dataProxyPath("/api/prices"), {
+  const r = await dataProxyFetch(dataProxyPath("/api/prices"), {
     cache: "no-store",
     signal: AbortSignal.timeout(12_000),
   });

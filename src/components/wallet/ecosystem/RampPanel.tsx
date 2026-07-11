@@ -12,6 +12,7 @@ import type { WalletAddresses } from "@/lib/wallet";
 import { EcosystemTokenPicker } from "./EcosystemTokenPicker";
 import { ProviderBadge } from "./ProviderBadge";
 import { HelpTooltip } from "./HelpTooltip";
+import { useI18n } from "@/lib/i18n";
 
 function addressForToken(token: EcosystemToken, addresses: WalletAddresses | null) {
   if (!addresses) return "";
@@ -37,6 +38,7 @@ export function RampPanel({
   tokens: EcosystemToken[];
   addresses: WalletAddresses | null;
 }) {
+  const { t } = useI18n();
   const toast = useToast();
   const [provider, setProvider] = useState<RampProvider>("moonpay");
   const [mode, setMode] = useState<"buy" | "sell">("buy");
@@ -78,14 +80,14 @@ export function RampPanel({
   };
 
   if (!selected) {
-    return <div style={{ padding: 28, textAlign: "center", color: "rgba(255,255,255,0.30)" }}>No wallet address is available for ramp providers.</div>;
+    return <div style={{ padding: 28, textAlign: "center", color: "rgba(255,255,255,0.30)" }}>{t("No wallet address is available for ramp providers.")}</div>;
   }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-          <div style={{ fontSize: 18, fontWeight: 650, color: "#fff" }}>Buy / Sell</div>
+          <div style={{ fontSize: 18, fontWeight: 650, color: "#fff" }}>{t("Buy / Sell")}</div>
           <HelpTooltip label="About buy and sell">
             MoonPay or Transak opens as a third-party provider. Silent Wallet passes your public address only; the provider handles payment, KYC, and order status.
           </HelpTooltip>
@@ -117,7 +119,7 @@ export function RampPanel({
             onClick={() => setMode(item)}
             style={{ height: 40, borderRadius: 13, border: `1px solid ${mode === item ? "rgba(255,255,255,0.20)" : "rgba(255,255,255,0.08)"}`, background: mode === item ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.04)", color: mode === item ? "#fff" : "rgba(255,255,255,0.42)", font: "inherit", fontSize: 13, fontWeight: 650, cursor: "pointer" }}
           >
-            {item === "buy" ? "Buy" : "Sell"}
+            {t(item === "buy" ? "Buy" : "Sell")}
           </button>
         ))}
       </div>
@@ -130,14 +132,14 @@ export function RampPanel({
       </div>
 
       <div style={{ padding: "12px 14px", borderRadius: 14, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-        <div className="label" style={{ marginBottom: 7 }}>Receiving wallet address</div>
+        <div className="label" style={{ marginBottom: 7 }}>{t("Receiving wallet address")}</div>
         <div style={{ fontFamily: "monospace", fontSize: 12, color: "rgba(255,255,255,0.55)", overflowWrap: "anywhere" }}>{walletAddress || "No address available"}</div>
       </div>
 
       {neitherEnabled && (
         <div style={{ display: "flex", gap: 9, padding: "12px 14px", borderRadius: 14, border: "1px solid rgba(251,191,36,0.18)", background: "rgba(251,191,36,0.06)" }}>
           <Icons.info size={15} color="rgba(251,191,36,0.82)" />
-          <span style={{ fontSize: 12, color: "rgba(251,210,120,0.76)" }}>MoonPay or Transak is not configured yet.</span>
+          <span style={{ fontSize: 12, color: "rgba(251,210,120,0.76)" }}>{t("MoonPay or Transak is not configured yet.")}</span>
         </div>
       )}
 

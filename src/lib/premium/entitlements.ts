@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { dataProxyPath } from "@/lib/api";
+import { dataProxyFetch, dataProxyPath } from "@/lib/api";
 import { premiumEnabled, premiumPurchaseUrl } from "./config";
 import { getStoredPremiumState, removePremiumLicenseState, savePremiumLicenseState, subscribePremium } from "./storage";
 import type { PremiumEntitlement, PremiumValidationResponse } from "./types";
@@ -21,7 +21,7 @@ export function usePremium() {
     setValidating(true);
     setMessage("");
     try {
-      const response = await fetch(dataProxyPath("/api/premium/validate"), {
+      const response = await dataProxyFetch(dataProxyPath("/api/premium/validate"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ licenseKey }),

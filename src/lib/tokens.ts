@@ -1,6 +1,6 @@
 // ERC-20 / BEP-20 token balance discovery + pricing
 import { rpcUrl, coinGeckoHeaders } from "./config";
-import { dataProxyPath } from "./api";
+import { dataProxyFetch, dataProxyPath } from "./api";
 
 export type EvmToken = {
   contract:  string;
@@ -243,7 +243,7 @@ export async function fetchAllEvmTokensServer(ethAddress: string, bscAddress: st
 export async function fetchAllEvmTokens(ethAddress: string, bscAddress: string): Promise<EvmToken[]> {
   if (typeof window !== "undefined") {
     const params = new URLSearchParams({ eth: ethAddress, bsc: bscAddress });
-    const r = await fetch(dataProxyPath(`/api/tokens?${params.toString()}`), {
+    const r = await dataProxyFetch(dataProxyPath(`/api/tokens?${params.toString()}`), {
       signal: AbortSignal.timeout(25_000),
       cache: "no-store",
     });

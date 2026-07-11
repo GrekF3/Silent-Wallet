@@ -16,6 +16,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { AccountSelector } from "@/components/accounts/AccountSelector";
 import { useWalletAccounts } from "@/lib/accounts/storage";
 import { useUserExperience } from "@/lib/userExperience/mode";
+import { useI18n } from "@/lib/i18n";
 
 type WalletNetwork = "ethereum" | "bitcoin" | "bsc" | "solana";
 type SortMode = "value" | "name";
@@ -122,6 +123,7 @@ function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
 }
 
 function AssetRow({ asset, privacyMode, onClick }: { asset: DisplayAsset; privacyMode: boolean; onClick: () => void }) {
+  const { t } = useI18n();
   const pos = asset.change24h >= 0;
   const needsPrice = asset.balance > 0 && asset.priceUSD <= 0;
   return (
@@ -138,7 +140,7 @@ function AssetRow({ asset, privacyMode, onClick }: { asset: DisplayAsset; privac
         <Sparkline data={asset.spark7d} width={56} height={26} positive={asset.change7d >= 0} />
         <div style={{ textAlign: "right", minWidth: 86, flexShrink: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 550, color: "#fff", fontVariantNumeric: "tabular-nums", marginBottom: 3 }}>
-            {privacyMode ? "••••" : needsPrice ? "Pricing..." : formatUSD(asset.valueUSD)}
+            {privacyMode ? "••••" : needsPrice ? t("Pricing...") : formatUSD(asset.valueUSD)}
           </div>
           <span style={{ fontSize: 11, fontWeight: 500, color: pos ? "rgba(255,255,255,0.55)" : "rgba(255,100,100,0.75)", fontVariantNumeric: "tabular-nums" }}>
             {pos ? "+" : ""}{asset.change24h.toFixed(2)}%
@@ -156,6 +158,7 @@ function NetworkFilter({
   selected: WalletNetwork[];
   onApply: (networks: WalletNetwork[]) => void;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<WalletNetwork[]>(selected);
   const [query, setQuery] = useState("");
@@ -171,7 +174,7 @@ function NetworkFilter({
         type="button"
         onClick={() => { setOpen((v) => !v); setDraft(selected); }}
         style={{ width: 42, height: 42, borderRadius: 14, border: "1px solid rgba(255,255,255,0.10)", borderTop: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.58)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
-        title="Filter networks"
+        title={t("Filter networks")}
       >
         <Icons.filter size={15} />
       </button>
@@ -186,16 +189,16 @@ function NetworkFilter({
             className="dashboard-popover"
           >
             <div className="popover-title">
-              <Icons.filter size={14} /> Networks
+              <Icons.filter size={14} /> {t("Networks")}
             </div>
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search networks"
+              placeholder={t("Search networks")}
               className="popover-input"
             />
             <button type="button" className="popover-row" onClick={() => setDraft(NETWORKS)}>
-              <Icons.check size={14} /> All networks
+              <Icons.check size={14} /> {t("All networks")}
             </button>
             {filtered.map((network) => {
               const active = draft.includes(network);
@@ -209,8 +212,8 @@ function NetworkFilter({
               );
             })}
             <div className="popover-actions">
-              <button type="button" onClick={() => { setDraft(selected); setOpen(false); }}>Cancel</button>
-              <button type="button" onClick={() => { onApply(draft.length ? draft : NETWORKS); setOpen(false); }}>Apply</button>
+              <button type="button" onClick={() => { setDraft(selected); setOpen(false); }}>{t("Cancel")}</button>
+              <button type="button" onClick={() => { onApply(draft.length ? draft : NETWORKS); setOpen(false); }}>{t("Apply")}</button>
             </div>
           </motion.div>
         )}
@@ -232,6 +235,7 @@ function MoreMenu({
   setHideZero: (v: boolean) => void;
   openManage: () => void;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   return (
     <div style={{ position: "relative" }}>
@@ -239,7 +243,7 @@ function MoreMenu({
         type="button"
         onClick={() => setOpen((v) => !v)}
         style={{ width: 42, height: 42, borderRadius: 14, border: "1px solid rgba(255,255,255,0.10)", borderTop: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.58)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
-        title="More actions"
+        title={t("More actions")}
       >
         <Icons.more size={16} />
       </button>
@@ -252,15 +256,15 @@ function MoreMenu({
             transition={{ duration: 0.15 }}
             className="dashboard-popover dashboard-popover-right"
           >
-            <div className="popover-title"><Icons.more size={14} /> Actions</div>
+            <div className="popover-title"><Icons.more size={14} /> {t("Actions")}</div>
             <button type="button" className="popover-row" onClick={() => setSortMode(sortMode === "value" ? "name" : "value")}>
-              <Icons.sort size={14} /> Sort by {sortMode === "value" ? "name" : "balance"}
+              <Icons.sort size={14} /> {t("Sort by")} {t(sortMode === "value" ? "name" : "balance")}
             </button>
             <button type="button" className="popover-row" onClick={() => { setOpen(false); openManage(); }}>
-              <Icons.coins size={14} /> Manage coins
+              <Icons.coins size={14} /> {t("Manage coins")}
             </button>
             <button type="button" className="popover-row" onClick={() => setHideZero(!hideZero)}>
-              {hideZero ? <Icons.eyeOff size={14} /> : <Icons.eye size={14} />} Hide 0 balances
+              {hideZero ? <Icons.eyeOff size={14} /> : <Icons.eye size={14} />} {t("Hide 0 balances")}
             </button>
           </motion.div>
         )}
@@ -270,6 +274,7 @@ function MoreMenu({
 }
 
 function ManageCoinsModal({ assets, onClose }: { assets: DisplayAsset[]; onClose: () => void }) {
+  const { t } = useI18n();
   const { hiddenAssetIds, toggleHiddenAsset } = useWalletStore();
   const [query, setQuery] = useState("");
   const filtered = assets.filter((asset) => `${asset.symbol} ${asset.name} ${NET_LABEL[asset.network]}`.toLowerCase().includes(query.toLowerCase()));
@@ -295,14 +300,14 @@ function ManageCoinsModal({ assets, onClose }: { assets: DisplayAsset[]; onClose
               <Icons.coins size={17} color="rgba(255,255,255,0.62)" />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 17, fontWeight: 650, color: "#fff" }}>Manage coins</div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.32)" }}>Disabled coins are not shown in the wallet</div>
+              <div style={{ fontSize: 17, fontWeight: 650, color: "#fff" }}>{t("Manage coins")}</div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.32)" }}>{t("Disabled coins are not shown in the wallet")}</div>
             </div>
             <button type="button" onClick={onClose} style={{ width: 34, height: 34, borderRadius: 11, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
               <Icons.x size={15} color="rgba(255,255,255,0.52)" />
             </button>
           </div>
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search assets" className="popover-input" style={{ marginBottom: 10 }} />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("Search assets")} className="popover-input" style={{ marginBottom: 10 }} />
           <div style={{ maxHeight: "min(420px, 58vh)", overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
             {filtered.map((asset) => {
               const active = !hiddenAssetIds.includes(asset.id);
@@ -328,6 +333,7 @@ const stagger: Variants = { hidden: {}, show: { transition: { staggerChildren: 0
 const up: Variants = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, transition: { duration: 0.30 } } };
 
 export function Dashboard() {
+  const { t } = useI18n();
   const {
     assets, evmTokens, splTokens, transactions, addresses, loading, initialLoaded, loadingState, lastUpdated, setView, openTransfer, setEcosystemTab, openAsset,
     sessionMode, watchName, activeAccountIndex,
@@ -459,11 +465,11 @@ export function Dashboard() {
           <div style={{ minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10, flexWrap: "wrap" }}>
               <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.28)" }}>
-                {watchOnly ? "Observer portfolio" : `Active account · ${activeAccount?.name ?? "Main"}`}
+                {watchOnly ? t("Observer portfolio") : `${t("Active account")} · ${activeAccount?.name ?? t("Main")}`}
               </span>
               {watchOnly && (
                 <span style={{ fontSize: 10, fontWeight: 650, padding: "2px 7px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.42)" }}>
-                  Observer{watchName ? ` · ${watchName}` : ""}
+                  {t("Observer")}{watchName ? ` · ${watchName}` : ""}
                 </span>
               )}
               <button type="button" onClick={() => setPrivacyMode(!privacyMode)} title={privacyMode ? "Show balance" : "Hide balance"} style={{ width: 28, height: 28, borderRadius: 9, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.045)", color: "rgba(255,255,255,0.46)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
@@ -480,7 +486,7 @@ export function Dashboard() {
               )}
             </div>
             <div style={{ marginTop: 5, fontSize: 11, color: "rgba(255,255,255,0.28)" }}>
-              {watchOnly ? "Observer mode cannot sign transactions." : activeAccount?.purpose ?? "Approximately"}
+              {watchOnly ? t("Observer mode cannot sign transactions.") : activeAccount?.purpose ?? t("Approximately")}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
               {!showTotalSkeleton && !privacyMode && (
@@ -508,7 +514,7 @@ export function Dashboard() {
                 </button>
               )}
               {addr && (
-                <button onClick={() => { navigator.clipboard.writeText(addr); toast("Address copied"); }}
+                <button onClick={() => { navigator.clipboard.writeText(addr); toast(t("Address copied")); }}
                   style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontFamily: "monospace", color: "rgba(255,255,255,0.26)", cursor: "pointer", background: "none", border: "none", padding: 0 }}>
                   {shortenAddress(addr, 4)} <Icons.copy size={10} color="rgba(255,255,255,0.24)" />
                 </button>
@@ -520,14 +526,14 @@ export function Dashboard() {
                   ? `Partial data: ${partialErrors.join(", ")}`
                   : lastUpdated
                     ? `Updated ${formatDate(new Date(lastUpdated))}`
-                    : "Indexing wallet"}
+                    : t("Indexing wallet")}
               </div>
             )}
           </div>
           {!watchOnly && (
             <div className="dashboard-actions" style={{ display: "flex", gap: 8, paddingTop: 4, flexShrink: 0 }}>
-              <GlassButton variant="primary" size="md" onClick={() => openTransfer("send")}><Icons.send size={13} color="#000" /> Send</GlassButton>
-              <GlassButton variant="default" size="md" onClick={() => openTransfer("receive")}><Icons.receive size={13} /> Receive</GlassButton>
+              <GlassButton variant="primary" size="md" onClick={() => openTransfer("send")}><Icons.send size={13} color="#000" /> {t("Send")}</GlassButton>
+              <GlassButton variant="default" size="md" onClick={() => openTransfer("receive")}><Icons.receive size={13} /> {t("Receive")}</GlassButton>
             </div>
           )}
         </div>
@@ -551,8 +557,8 @@ export function Dashboard() {
             <GlassCard elevated style={{ padding: "14px 16px 12px", overflow: "hidden" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 650, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.34)" }}>Overview</div>
-                  <div style={{ marginTop: 4, fontSize: 12, color: "rgba(255,255,255,0.24)" }}>Portfolio value, 7D</div>
+                  <div style={{ fontSize: 11, fontWeight: 650, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.34)" }}>{t("Overview")}</div>
+                  <div style={{ marginTop: 4, fontSize: 12, color: "rgba(255,255,255,0.24)" }}>{t("Portfolio value, 7D")}</div>
                 </div>
                 <button
                   type="button"
@@ -599,7 +605,7 @@ export function Dashboard() {
                 style={{ minHeight: 58, borderRadius: 16, border: "1px solid rgba(255,255,255,0.10)", borderTop: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.055)", color: "rgba(255,255,255,0.72)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", font: "inherit", fontSize: 12, fontWeight: 650, boxShadow: "0 2px 10px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.08)" }}
               >
                 <Icon size={15} />
-                {item.label}
+                {t(item.label)}
               </button>
             );
           })}
@@ -611,8 +617,8 @@ export function Dashboard() {
           <GlassCard hover onClick={() => setView("accounts")} style={{ padding: 16, borderRadius: 18, cursor: "pointer" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 650, color: "#fff" }}>Account separation</div>
-                <div style={{ marginTop: 4, fontSize: 12, color: "rgba(255,255,255,0.34)" }}>Keep treasury, operations, and receiving activity distinct.</div>
+                <div style={{ fontSize: 14, fontWeight: 650, color: "#fff" }}>{t("Account separation")}</div>
+                <div style={{ marginTop: 4, fontSize: 12, color: "rgba(255,255,255,0.34)" }}>{t("Keep treasury, operations, and receiving activity distinct.")}</div>
               </div>
               <div style={{ width: 42, height: 42, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.055)", border: "1px solid rgba(255,255,255,0.09)" }}>
                 <Icons.wallet size={17} color="rgba(255,255,255,0.52)" />
@@ -622,8 +628,8 @@ export function Dashboard() {
           <GlassCard hover onClick={() => setView("learn")} style={{ padding: 16, borderRadius: 18, cursor: "pointer" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 650, color: "#fff" }}>Academy</div>
-                <div style={{ marginTop: 4, fontSize: 12, color: "rgba(255,255,255,0.34)" }}>{ux.beginnerMode ? "Understand self-custody without noise." : "Review new recipients before sending."}</div>
+                <div style={{ fontSize: 14, fontWeight: 650, color: "#fff" }}>{t("Academy")}</div>
+                <div style={{ marginTop: 4, fontSize: 12, color: "rgba(255,255,255,0.34)" }}>{t(ux.beginnerMode ? "Understand self-custody without noise." : "Review new recipients before sending.")}</div>
               </div>
               <div style={{ width: 42, height: 42, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.055)", border: "1px solid rgba(255,255,255,0.09)" }}>
                 <Icons.help size={17} color="rgba(255,255,255,0.52)" />
@@ -642,7 +648,7 @@ export function Dashboard() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search assets"
+              placeholder={t("Search assets")}
               style={{ width: "100%", height: 42, paddingLeft: 38, paddingRight: 14, borderRadius: 14, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", borderTop: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontSize: 13, fontFamily: "inherit", outline: "none", boxShadow: "inset 0 1px 4px rgba(0,0,0,0.2)", boxSizing: "border-box" }}
             />
             {search && (
@@ -658,9 +664,9 @@ export function Dashboard() {
 
       <motion.div variants={up}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-          <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.28)" }}>Recent activity</span>
+          <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.28)" }}>{t("Recent activity")}</span>
           <button onClick={() => setView("history")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "rgba(255,255,255,0.28)", cursor: "pointer", background: "none", border: "none", fontFamily: "inherit" }}>
-            View all <Icons.chevronR size={12} color="rgba(255,255,255,0.24)" />
+            {t("View all")} <Icons.chevronR size={12} color="rgba(255,255,255,0.24)" />
           </button>
         </div>
         <GlassCard style={{ padding: recentActivity.length ? "4px 14px" : 0, borderRadius: 18 }}>
@@ -670,7 +676,7 @@ export function Dashboard() {
                 {tx.type === "receive" ? <Icons.receive size={14} color="rgba(255,255,255,0.55)" /> : <Icons.send size={14} color="rgba(255,255,255,0.55)" />}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 650, color: "#fff" }}>{tx.type === "receive" ? "Received" : "Sent"} {tx.asset}</div>
+                <div style={{ fontSize: 13, fontWeight: 650, color: "#fff" }}>{t(tx.type === "receive" ? "Received" : "Sent")} {tx.asset}</div>
                 <div style={{ marginTop: 2, fontSize: 11, color: "rgba(255,255,255,0.26)" }}>{formatDate(tx.date)}</div>
               </div>
               <div style={{ textAlign: "right", fontSize: 13, fontWeight: 650, color: tx.type === "receive" ? "rgba(120,220,90,0.82)" : "rgba(255,255,255,0.54)" }}>
@@ -678,7 +684,7 @@ export function Dashboard() {
               </div>
             </div>
           )) : (
-            <EmptyState icon="clock" title="Nothing here yet. That is okay." body="Your recent transfers will appear after the wallet indexes activity." />
+            <EmptyState icon="clock" title={t("Nothing here yet. That is okay.")} body={t("Your recent transfers will appear after the wallet indexes activity.")} />
           )}
         </GlassCard>
       </motion.div>
@@ -686,10 +692,10 @@ export function Dashboard() {
       <motion.div variants={up}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
           <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.28)" }}>
-            Assets {visibleAssets.length > 0 && `· ${visibleAssets.length}`}
+            {t("Assets")} {visibleAssets.length > 0 && `· ${visibleAssets.length}`}
           </span>
           <button onClick={() => setView("history")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "rgba(255,255,255,0.28)", cursor: "pointer", background: "none", border: "none", fontFamily: "inherit" }}>
-            Activity <Icons.chevronR size={12} color="rgba(255,255,255,0.24)" />
+            {t("Activity")} <Icons.chevronR size={12} color="rgba(255,255,255,0.24)" />
           </button>
         </div>
 
@@ -724,9 +730,9 @@ export function Dashboard() {
               {visibleAssets.length === 0 && !loading && (
                 <EmptyState
                   icon={search ? "search" : "coins"}
-                  title={search ? `No results for "${search}"` : "No assets yet."}
-                  body={search ? "Try another symbol or network." : "Receive crypto or import a wallet to get started."}
-                  action={!search && !watchOnly ? { label: "Receive", onClick: () => openTransfer("receive"), icon: "receive" } : undefined}
+                  title={search ? `${t("No results for")} "${search}"` : t("No assets yet.")}
+                  body={t(search ? "Try another symbol or network." : "Receive crypto or import a wallet to get started.")}
+                  action={!search && !watchOnly ? { label: t("Receive"), onClick: () => openTransfer("receive"), icon: "receive" } : undefined}
                 />
               )}
             </motion.div>

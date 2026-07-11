@@ -8,6 +8,7 @@ import { useWalletStore } from "@/lib/store";
 import { useToast }    from "@/components/ui/Toast";
 import { bitcoinAddressForNetwork } from "@/lib/bitcoin";
 import { AccountSelector } from "@/components/accounts/AccountSelector";
+import { useI18n } from "@/lib/i18n";
 
 const NETWORKS = [
   { id: "ethereum" as const, label: "Ethereum", symbol: "ETH"   },
@@ -39,6 +40,7 @@ function QRGrid({ seed, size = 168 }: { seed: string; size?: number }) {
 }
 
 export function ReceiveView() {
+  const { t } = useI18n();
   const { addresses, mnemonic, network: activeNetwork, activeAccountIndex, activeAddressIndexes } = useWalletStore();
   const toast = useToast();
   const [netIdx, setNetIdx] = useState(0);
@@ -76,12 +78,12 @@ export function ReceiveView() {
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }}
       style={{ padding: "36px 28px", display: "flex", flexDirection: "column", gap: 24, maxWidth: 480 }}>
       <div>
-        <span style={LABEL}>Deposit</span>
-        <div style={{ fontSize: 28, fontWeight: 300, letterSpacing: "-0.015em", color: "#fff" }}>Receive</div>
+        <span style={LABEL}>{t("Deposit")}</span>
+        <div style={{ fontSize: 28, fontWeight: 300, letterSpacing: "-0.015em", color: "#fff" }}>{t("Receive")}</div>
       </div>
       {mnemonic && (
         <div>
-          <span style={LABEL}>Receiving account</span>
+          <span style={LABEL}>{t("Receiving account")}</span>
           <AccountSelector />
         </div>
       )}
@@ -112,23 +114,23 @@ export function ReceiveView() {
           <div style={{ textAlign: "center", width: "100%" }}>
             <span style={{ ...LABEL, marginBottom: 8 }}>{activeNetwork} {network.label} address</span>
             <div style={{ fontSize: 12, fontFamily: "monospace", color: "rgba(255,255,255,0.50)", wordBreak: "break-all", lineHeight: 1.6 }}>
-              {addr || "Address unavailable"}
+              {addr || t("Address unavailable")}
             </div>
           </div>
 
           <div style={{ display: "flex", gap: 10, width: "100%" }}>
             <GlassButton variant="default" size="md" style={{ flex: 1 }} onClick={copy} disabled={!addr}>
-              <Icons.copy size={13} /> Copy
+              <Icons.copy size={13} /> {t("Copy")}
             </GlassButton>
             <GlassButton variant="ghost" size="md" style={{ flex: 1 }} onClick={share} disabled={!addr}>
-              <Icons.share size={13} /> Share
+              <Icons.share size={13} /> {t("Share")}
             </GlassButton>
           </div>
         </div>
       </GlassCard>
 
       <div style={{ fontSize: 12, color: "rgba(255,255,255,0.18)", textAlign: "center", lineHeight: 1.5 }}>
-        Only send {network.symbol} assets to this address.
+        {t("Only send")} {network.symbol} {t("assets to this address.")}
       </div>
     </motion.div>
   );

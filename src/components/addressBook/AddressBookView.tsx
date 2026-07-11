@@ -11,8 +11,10 @@ import { deleteAddressBookContact, useAddressBook } from "@/lib/addressBook/stor
 import type { AddressBookContact } from "@/lib/addressBook/types";
 import { shortenAddress } from "@/lib/utils";
 import { AddressBookModal } from "./AddressBookModal";
+import { useI18n } from "@/lib/i18n";
 
 export function AddressBookView() {
+  const { t } = useI18n();
   const contacts = useAddressBook();
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<AddressBookContact | undefined>();
@@ -33,14 +35,14 @@ export function AddressBookView() {
       </AnimatePresence>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
         <div>
-          <span className="label">Address Book</span>
-          <div style={{ marginTop: 8, fontSize: 28, fontWeight: 300, color: "#fff", letterSpacing: 0 }}>Trusted recipients, saved locally.</div>
+          <span className="label">{t("Address Book")}</span>
+          <div style={{ marginTop: 8, fontSize: 28, fontWeight: 300, color: "#fff", letterSpacing: 0 }}>{t("Trusted recipients, saved locally.")}</div>
         </div>
-        <GlassButton variant="primary" size="md" onClick={openNew}><Icons.plus size={13} color="#000" /> Add</GlassButton>
+        <GlassButton variant="primary" size="md" onClick={openNew}><Icons.plus size={13} color="#000" /> {t("Add")}</GlassButton>
       </div>
-      <GlassInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search contacts" />
+      <GlassInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("Search contacts")} />
       {filtered.length === 0 ? (
-        <EmptyState icon="wallet" title="No contacts yet." body="Save trusted recipients before sending larger amounts." action={{ label: "Add contact", onClick: openNew, icon: "plus" }} />
+        <EmptyState icon="wallet" title={t("No contacts yet.")} body={t("Save trusted recipients before sending larger amounts.")} action={{ label: t("Add contact"), onClick: openNew, icon: "plus" }} />
       ) : (
         <div style={{ display: "grid", gap: 9 }}>
           {filtered.map((contact) => (
@@ -57,9 +59,9 @@ export function AddressBookView() {
                   <div style={{ marginTop: 3, fontFamily: "monospace", fontSize: 12, color: "rgba(255,255,255,0.32)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{shortenAddress(contact.address, 8)}</div>
                   {contact.notes && <div style={{ marginTop: 4, fontSize: 12, color: "rgba(255,255,255,0.28)" }}>{contact.notes}</div>}
                 </div>
-                <GlassButton variant="ghost" size="sm" onClick={() => navigator.clipboard.writeText(contact.address)}>Copy</GlassButton>
-                <GlassButton variant="ghost" size="sm" onClick={() => openEdit(contact)}>Edit</GlassButton>
-                <GlassButton variant="ghost" size="sm" onClick={() => deleteAddressBookContact(contact.id)}>Delete</GlassButton>
+                <GlassButton variant="ghost" size="sm" onClick={() => navigator.clipboard.writeText(contact.address)}>{t("Copy")}</GlassButton>
+                <GlassButton variant="ghost" size="sm" onClick={() => openEdit(contact)}>{t("Edit")}</GlassButton>
+                <GlassButton variant="ghost" size="sm" onClick={() => deleteAddressBookContact(contact.id)}>{t("Delete")}</GlassButton>
               </div>
             </GlassCard>
           ))}

@@ -15,6 +15,7 @@ import { RampPanel } from "./RampPanel";
 import { SwapPanel } from "./SwapPanel";
 import { BridgePanel } from "./BridgePanel";
 import { HelpTooltip } from "./HelpTooltip";
+import { useI18n } from "@/lib/i18n";
 
 const TABS: { id: EcosystemTab; label: string; icon: keyof typeof Icons }[] = [
   { id: "ramp", label: "Buy / Sell", icon: "wallet" },
@@ -116,6 +117,7 @@ function fallbackRampTokens(): EcosystemToken[] {
 }
 
 export function EcosystemView() {
+  const { t } = useI18n();
   const {
     assets,
     evmTokens,
@@ -156,7 +158,7 @@ export function EcosystemView() {
       style={{ padding: "32px 28px", maxWidth: 720, display: "flex", flexDirection: "column", gap: 20 }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14 }}>
         <div>
-          <span className="label">Web3 ecosystem</span>
+          <span className="label">{t("Web3 ecosystem")}</span>
           <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ fontSize: 28, fontWeight: 300, color: "#fff", letterSpacing: 0 }}>Web3</div>
             <HelpTooltip label="About Web3">
@@ -191,7 +193,7 @@ export function EcosystemView() {
                 style={{ height: 42, borderRadius: 12, border: `1px solid ${active ? "rgba(255,255,255,0.14)" : "transparent"}`, background: active ? "rgba(255,255,255,0.10)" : "transparent", color: active ? "#fff" : "rgba(255,255,255,0.38)", font: "inherit", fontSize: 13, fontWeight: 650, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, cursor: "pointer" }}
               >
                 <Icon size={14} />
-                {tab.label}
+                {t(tab.label)}
               </button>
             );
           })}

@@ -8,8 +8,10 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { LEARN_ARTICLES, useLearnProgress, type LearnArticle } from "@/lib/learn/articles";
 import { LearnArticleCard } from "./LearnArticleCard";
 import { LearnArticleView } from "./LearnArticleView";
+import { useI18n } from "@/lib/i18n";
 
 export function LearnCenter() {
+  const { t } = useI18n();
   const completed = useLearnProgress();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<LearnArticle["category"] | "all">("all");
@@ -25,8 +27,8 @@ export function LearnCenter() {
     <motion.div className="view-shell" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
       style={{ padding: "32px 28px", maxWidth: 720, display: "flex", flexDirection: "column", gap: 22 }}>
       <div>
-        <span className="label">Academy</span>
-        <div style={{ marginTop: 8, fontSize: 28, fontWeight: 300, color: "#fff", letterSpacing: 0 }}>Understand Web3 without the noise.</div>
+        <span className="label">{t("Academy")}</span>
+        <div style={{ marginTop: 8, fontSize: 28, fontWeight: 300, color: "#fff", letterSpacing: 0 }}>{t("Understand Web3 without the noise.")}</div>
       </div>
 
       {selected ? (
@@ -34,7 +36,7 @@ export function LearnCenter() {
       ) : (
         <>
           <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "center" }}>
-            <GlassInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search articles" />
+            <GlassInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("Search articles")} />
             <div style={{ display: "flex", padding: 3, borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)" }}>
               {(["all", "basics", "safety", "web3"] as const).map((item) => (
                 <button
@@ -52,7 +54,7 @@ export function LearnCenter() {
             {filtered.map((article) => (
               <LearnArticleCard key={article.slug} article={article} completed={completed.includes(article.slug)} onOpen={() => setSelected(article)} />
             ))}
-            {filtered.length === 0 && <EmptyState icon="search" title="Nothing found." body="Try a shorter search or another topic." />}
+            {filtered.length === 0 && <EmptyState icon="search" title={t("Nothing found.")} body={t("Try a shorter search or another topic.")} />}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, color: "rgba(255,255,255,0.28)", fontSize: 12 }}>
             <Icons.check size={13} /> {completed.length}/{LEARN_ARTICLES.length} read
