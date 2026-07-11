@@ -45,7 +45,7 @@ export function AppShell({ onLock }: { onLock: () => void }) {
 
   return (
     <ToastProvider>
-      <div className="app-shell" style={{ display:"flex", flexDirection:"column", height:"100vh", width:"100vw", overflow:"hidden", background:"var(--bg)", position:"relative" }}>
+      <div className="app-shell" style={{ display:"flex", flexDirection:"column", width:"100vw", overflow:"hidden", background:"var(--bg)", position:"relative" }}>
 
         {/* Atmosphere */}
         <div aria-hidden style={{ position:"fixed", inset:0, zIndex:0, pointerEvents:"none",
