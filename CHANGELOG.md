@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.6
+
+- Added English and Russian interface switching with the language preference saved on-device.
+- Fixed Windows desktop balance, price, token, and history loading through the native Tauri HTTP client.
+- Improved swap token selection, quote review, fee presentation, and responsive Web3 layouts.
+- Updated native builds to use the hosted Silent Wallet data proxy by default.
+
 ## 0.1.5
 
 - Added Silent Pro premium licensing flows and entitlement checks.

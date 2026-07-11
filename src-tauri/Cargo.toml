@@ -1,6 +1,6 @@
 [package]
 name = "silent-wallet"
-version = "0.1.4"
+version = "0.1.6"
 description = "Silent Wallet desktop shell"
 authors = ["Silent Wallet contributors"]
 license = "MIT"
