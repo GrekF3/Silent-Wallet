@@ -1,10 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.1.8
 
 - Added TRON accounts with BIP-44 address derivation, account separation, and watch-only support.
 - Added TRX balances, pricing, history, sending, and receiving.
 - Added verified USDT TRC-20 balances, history, locally signed transfers, and TronScan links.
+- Added Russian TRON/TRC-20 interface copy and Energy/Bandwidth fee guidance.
 
 ## 0.1.7
 
