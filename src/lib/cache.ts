@@ -2,6 +2,7 @@ import type { AssetInfo } from "./store";
 import type { ChainTx } from "./chains";
 import type { EvmToken } from "./tokens";
 import type { SplToken } from "./solana";
+import type { Trc20Token } from "./tron";
 import type { Prices } from "./prices";
 
 type CachePayload = {
@@ -10,11 +11,12 @@ type CachePayload = {
   transactions: ChainTx[];
   evmTokens:    EvmToken[];
   splTokens:    SplToken[];
+  trc20Tokens:  Trc20Token[];
   prices?:       Prices;
   ts:           number;
 };
 
-const CACHE_VERSION = 5;
+const CACHE_VERSION = 6;
 const TTL = 30 * 60 * 1000; // 30 min — стейл данные лучше чем ничего
 
 function key(address: string, network: string) {

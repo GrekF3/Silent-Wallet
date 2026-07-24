@@ -15,7 +15,7 @@ export function AccountSelector({ compact = false }: { compact?: boolean }) {
   const { addresses, activeAccountIndex, setActiveAccountIndex, sessionMode, watchName, setView } = useWalletStore();
   const [open, setOpen] = useState(false);
   const activeAccount = useMemo(() => accounts.find((account) => account.index === activeAccountIndex) ?? accounts[0], [accounts, activeAccountIndex]);
-  const activeAddress = addresses?.ethereum || addresses?.bitcoin || addresses?.solana || "";
+  const activeAddress = addresses?.ethereum || addresses?.bitcoin || addresses?.solana || addresses?.tron || "";
   const selectableAccounts = accounts.filter((account) => !account.archived);
   const proAccounts = premium.hasEntitlement("pro.accounts.multiple");
 

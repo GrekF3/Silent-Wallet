@@ -23,7 +23,7 @@ export type AccountDraft = {
   labels?: WalletAccountLabel[];
 };
 
-export type AccountAddressNetwork = "ethereum" | "bsc" | "bitcoin" | "solana";
+export type AccountAddressNetwork = "ethereum" | "bsc" | "bitcoin" | "solana" | "tron";
 
 export type AccountAddressSlot = {
   id: string;

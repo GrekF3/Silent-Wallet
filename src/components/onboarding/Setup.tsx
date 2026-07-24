@@ -13,6 +13,7 @@ import type { WalletAddresses } from "@/lib/wallet";
 import { useUserExperience } from "@/lib/userExperience/mode";
 import { discoverMnemonicAccounts } from "@/lib/accounts/discovery";
 import { useI18n } from "@/lib/i18n";
+import { isTronAddress } from "@/lib/tron";
 
 type Tab  = "create" | "import" | "watch";
 type Step = "start" | "phrase" | "confirm" | "password";
@@ -23,13 +24,16 @@ function watchAddresses(address: string): WalletAddresses | null {
   const value = address.trim();
   if (/^0x[0-9a-fA-F]{40}$/.test(value)) {
     const evm = value as `0x${string}`;
-    return { ethereum: evm, bsc: evm, bitcoin: "", solana: "" };
+    return { ethereum: evm, bsc: evm, bitcoin: "", solana: "", tron: "" };
   }
   if (/^(bc1|tb1|[13mn2])[a-zA-HJ-NP-Z0-9]{25,80}$/.test(value)) {
-    return { ethereum: EMPTY_EVM, bsc: EMPTY_EVM, bitcoin: value, solana: "" };
+    return { ethereum: EMPTY_EVM, bsc: EMPTY_EVM, bitcoin: value, solana: "", tron: "" };
+  }
+  if (isTronAddress(value)) {
+    return { ethereum: EMPTY_EVM, bsc: EMPTY_EVM, bitcoin: "", solana: "", tron: value };
   }
   if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value)) {
-    return { ethereum: EMPTY_EVM, bsc: EMPTY_EVM, bitcoin: "", solana: value };
+    return { ethereum: EMPTY_EVM, bsc: EMPTY_EVM, bitcoin: "", solana: value, tron: "" };
   }
   return null;
 }
@@ -107,7 +111,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
     const addresses = watchAddresses(watchAddress);
     const name = watchName.trim();
     if (!name) { setError(t("Name is required")); return; }
-    if (!addresses) { setError(t("Enter a valid Ethereum, BNB Chain, Bitcoin, or Solana address")); return; }
+    if (!addresses) { setError(t("Enter a valid Ethereum, BNB Chain, Bitcoin, Solana, or TRON address")); return; }
     setWatchSession(name, addresses);
     onDone();
   };
@@ -219,7 +223,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
                     />
                     <GlassInput
                       label={t("Address")}
-                      placeholder="0x…, bc1…, or Solana address"
+                      placeholder={t("0x…, bc1…, Solana, or T…")}
                       value={watchAddress}
                       onChange={(e) => { setWatchAddress(e.target.value); setError(""); }}
                     />

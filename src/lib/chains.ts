@@ -52,7 +52,7 @@ export type ChainTx = {
   tokenSymbol?: string;
   tokenImage?: string;
   tokenContract?: string;
-  network?:   "ethereum" | "bsc" | "bitcoin" | "solana";
+  network?:   "ethereum" | "bsc" | "bitcoin" | "solana" | "tron";
   id?:       string;
   verification?: "native" | "verified" | "unverified";
 };

@@ -15,6 +15,7 @@ const NETWORKS = [
   { id: "bitcoin"  as const, label: "Bitcoin",  symbol: "BTC"   },
   { id: "bsc"      as const, label: "BNB Chain",symbol: "BNB"   },
   { id: "solana"   as const, label: "Solana",   symbol: "SOL"   },
+  { id: "tron"     as const, label: "TRON",     symbol: "TRX"   },
 ];
 
 const LABEL: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.28)", display: "block", marginBottom: 10 };
@@ -54,6 +55,7 @@ export function ReceiveView() {
     bitcoin:  btcAddress,
     bsc:      addresses?.bsc      ?? "",
     solana:   addresses?.solana   ?? "",
+    tron:     addresses?.tron     ?? "",
   };
   const addr = addressMap[network.id];
 
@@ -130,7 +132,9 @@ export function ReceiveView() {
       </GlassCard>
 
       <div style={{ fontSize: 12, color: "rgba(255,255,255,0.18)", textAlign: "center", lineHeight: 1.5 }}>
-        {t("Only send")} {network.symbol} {t("assets to this address.")}
+        {network.id === "tron"
+          ? t("Only send TRX and TRC-20 assets to this address.")
+          : <>{t("Only send")} {network.symbol} {t("assets to this address.")}</>}
       </div>
     </motion.div>
   );

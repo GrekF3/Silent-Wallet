@@ -30,6 +30,7 @@ function nativeDecimals(asset: AssetInfo) {
 }
 
 function nativeTokenFromAsset(asset: AssetInfo): EcosystemToken {
+  if (asset.network === "tron") throw new Error("TRON is not available in the swap and bridge providers yet");
   const chainId = asset.network === "ethereum" ? 1 : asset.network === "bsc" ? 56 : undefined;
   return {
     id: `${asset.network}:native`,
@@ -148,7 +149,7 @@ export function EcosystemView() {
     ...defaultTokensForChain(1),
     ...defaultTokensForChain(56),
     ...fallbackRampTokens(),
-    ...assets.map(nativeTokenFromAsset),
+    ...assets.filter((asset) => asset.network !== "tron").map(nativeTokenFromAsset),
     ...evmTokens.map(evmTokenFromStore),
     ...splTokens.map(splTokenFromStore),
   ]), [assets, evmTokens, splTokens]);

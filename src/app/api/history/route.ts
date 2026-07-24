@@ -4,6 +4,7 @@ import { solanaRpcUrl } from "@/lib/config";
 import { fetchEvmRawHistory } from "@/lib/serverEvmHistory";
 import type { ChainTx, Network } from "@/lib/chains";
 import { verifiedEvmToken, verifiedTokenAmountUSD } from "@/lib/tokenVerification";
+import { getTronTransactions } from "@/lib/tron";
 
 export const dynamic = "force-dynamic";
 
@@ -222,20 +223,22 @@ export async function GET(req: NextRequest) {
   const bsc = searchParams.get("bsc") ?? "";
   const btc = searchParams.get("btc") ?? "";
   const sol = searchParams.get("sol") ?? "";
+  const tron = searchParams.get("tron") ?? "";
 
-  const [ethTxs, bscTxs, btcTxs, solTxs] = await Promise.allSettled([
+  const [ethTxs, bscTxs, btcTxs, solTxs, tronTxs] = await Promise.allSettled([
     fetchEvmHistory(eth, "eth", parseNumber(searchParams.get("ethPrice")), network),
     fetchEvmHistory(bsc, "bsc", parseNumber(searchParams.get("bnbPrice")), network),
     fetchBtcHistory(btc, parseNumber(searchParams.get("btcPrice")), network),
     fetchSolHistory(sol, parseNumber(searchParams.get("solPrice")), network),
+    getTronTransactions(tron, parseNumber(searchParams.get("trxPrice")), network),
   ]);
 
-  const errors = [ethTxs, bscTxs, btcTxs, solTxs]
+  const errors = [ethTxs, bscTxs, btcTxs, solTxs, tronTxs]
     .filter((res): res is PromiseRejectedResult => res.status === "rejected")
     .map((res) => res.reason instanceof Error ? res.reason.message : "History source failed");
 
   return NextResponse.json({
-    transactions: dedupeAndSerialize([ethTxs, bscTxs, btcTxs, solTxs].map((res) => res.status === "fulfilled" ? res.value : [])),
+    transactions: dedupeAndSerialize([ethTxs, bscTxs, btcTxs, solTxs, tronTxs].map((res) => res.status === "fulfilled" ? res.value : [])),
     errors,
   }, {
     headers: { "Cache-Control": "private, no-store" },

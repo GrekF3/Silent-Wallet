@@ -7,6 +7,7 @@ const COIN_IDS: Record<string, string> = {
   BTC:  "bitcoin",
   BNB:  "binancecoin",
   SOL:  "solana",
+  TRX:  "tron",
   USDC: "usd-coin",
 };
 
@@ -15,6 +16,7 @@ const FALLBACK_IMAGES: Record<string, string> = {
   BTC:  "https://coin-images.coingecko.com/coins/images/1/large/bitcoin.png",
   BNB:  "https://coin-images.coingecko.com/coins/images/825/large/bnb-icon2_2x.png",
   SOL:  "https://coin-images.coingecko.com/coins/images/4128/large/solana.png",
+  TRX:  "https://coin-images.coingecko.com/coins/images/1094/large/tron-logo.png",
   USDC: "https://coin-images.coingecko.com/coins/images/6319/large/USDC.png",
 };
 
@@ -130,6 +132,7 @@ async function binancePrices(): Promise<Partial<Record<string, number>>> {
     BTCUSDT: "BTC",
     BNBUSDT: "BNB",
     SOLUSDT: "SOL",
+    TRXUSDT: "TRX",
   };
   try {
     const symbols = encodeURIComponent(JSON.stringify(Object.keys(pairs)));

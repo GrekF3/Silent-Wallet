@@ -169,7 +169,7 @@ function normalizeAddressSlot(item: Partial<AccountAddressSlot>): AccountAddress
   const accountIndex = typeof item.accountIndex === "number" && Number.isInteger(item.accountIndex) && item.accountIndex >= 0 ? item.accountIndex : null;
   const addressIndex = typeof item.addressIndex === "number" && Number.isInteger(item.addressIndex) && item.addressIndex >= 0 ? item.addressIndex : null;
   const network = item.network;
-  if (accountIndex === null || addressIndex === null || !["ethereum", "bsc", "bitcoin", "solana"].includes(String(network))) return null;
+  if (accountIndex === null || addressIndex === null || !["ethereum", "bsc", "bitcoin", "solana", "tron"].includes(String(network))) return null;
   return {
     id: typeof item.id === "string" && item.id.trim() ? clean(item.id, 100) : makeAddressId(accountIndex, network as AccountAddressNetwork, addressIndex),
     accountIndex,
