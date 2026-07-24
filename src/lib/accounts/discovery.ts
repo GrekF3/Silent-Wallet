@@ -3,6 +3,7 @@
 import { bitcoinAddressForNetwork } from "@/lib/bitcoin";
 import { getBnbBalance, getBtcBalance, getEthBalance, type Network } from "@/lib/chains";
 import { getSolBalance, getSplTokens } from "@/lib/solana";
+import { getTrc20Tokens, getTrxBalance } from "@/lib/tron";
 import { fetchAllEvmTokens } from "@/lib/tokens";
 import { deriveAddresses } from "@/lib/wallet";
 import { upsertRecoveredWalletAccounts } from "./storage";
@@ -37,22 +38,24 @@ async function scanAccount(mnemonic: string, accountIndex: number, network: Netw
   const addresses = deriveAddresses(mnemonic, accountIndex);
   const bitcoinAddress = bitcoinAddressForNetwork(mnemonic, network, accountIndex, 0);
 
-  const [eth, bnb, btc, sol] = await Promise.all([
+  const [eth, bnb, btc, sol, trx] = await Promise.all([
     settleWithTimeout(getEthBalance(addresses.ethereum, network), 0),
     settleWithTimeout(getBnbBalance(addresses.bsc, network), 0),
     settleWithTimeout(getBtcBalance(bitcoinAddress, network), 0),
     settleWithTimeout(getSolBalance(addresses.solana, network), 0),
+    settleWithTimeout(getTrxBalance(addresses.tron, network), 0),
   ]);
 
-  if (eth > 0 || bnb > 0 || btc > 0 || sol > 0) return true;
+  if (eth > 0 || bnb > 0 || btc > 0 || sol > 0 || trx > 0) return true;
   if (network !== "mainnet") return false;
 
-  const [evmTokens, splTokens] = await Promise.all([
+  const [evmTokens, splTokens, trc20Tokens] = await Promise.all([
     settleWithTimeout(fetchAllEvmTokens(addresses.ethereum, addresses.bsc), []),
     settleWithTimeout(getSplTokens(addresses.solana, network), []),
+    settleWithTimeout(getTrc20Tokens(addresses.tron, network), []),
   ]);
 
-  return evmTokens.length > 0 || splTokens.length > 0;
+  return evmTokens.length > 0 || splTokens.length > 0 || trc20Tokens.some((token) => token.balance > 0);
 }
 
 export async function discoverMnemonicAccounts(

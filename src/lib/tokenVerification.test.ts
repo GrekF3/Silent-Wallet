@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ChainTx } from "./chains";
 import {
   isHiddenUnverifiedIncoming,
+  TRON_USDT_CONTRACT,
   transactionVerification,
   verifiedEvmToken,
   verifiedTokenAmountUSD,
@@ -38,6 +39,16 @@ describe("verified token registry", () => {
     expect(withTransactionVerification({ ...spoof, verification: "verified" }).verification).toBe("unverified");
     expect(verifiedTokenAmountUSD("ethereum", spoof.tokenContract, 500_000)).toBe(0);
     expect(verifiedTokenAmountUSD("ethereum", "0xdAC17F958D2ee523a2206206994597C13D831ec7", 12.5)).toBe(12.5);
+  });
+
+  it("verifies TRC-20 USDT by its TRON contract, not its symbol", () => {
+    const official = tx({ network: "tron", isToken: true, asset: "USDT", tokenContract: TRON_USDT_CONTRACT });
+    const spoof = tx({ network: "tron", isToken: true, asset: "USDT", tokenContract: "TJRabPrwbZy45sbavfcjinPJC18kjpRTv8" });
+
+    expect(transactionVerification(official)).toBe("verified");
+    expect(verifiedTokenAmountUSD("tron", TRON_USDT_CONTRACT, 25)).toBe(25);
+    expect(transactionVerification(spoof)).toBe("unverified");
+    expect(verifiedTokenAmountUSD("tron", spoof.tokenContract, 25)).toBe(0);
   });
 });
 

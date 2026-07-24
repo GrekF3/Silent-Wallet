@@ -19,7 +19,7 @@ import { useUserExperience } from "@/lib/userExperience/mode";
 import { useI18n } from "@/lib/i18n";
 import { transactionVerification, visibleHistoryTransactions } from "@/lib/tokenVerification";
 
-type WalletNetwork = "ethereum" | "bitcoin" | "bsc" | "solana";
+type WalletNetwork = "ethereum" | "bitcoin" | "bsc" | "solana" | "tron";
 type SortMode = "value" | "name";
 
 const NET_BG: Record<string, string> = {
@@ -27,6 +27,7 @@ const NET_BG: Record<string, string> = {
   bitcoin:  "rgba(247,147,26,0.13)",
   bsc:      "rgba(240,185,11,0.13)",
   solana:   "rgba(153,69,255,0.13)",
+  tron:     "rgba(255,69,79,0.13)",
 };
 
 const NET_LABEL: Record<WalletNetwork, string> = {
@@ -34,6 +35,7 @@ const NET_LABEL: Record<WalletNetwork, string> = {
   bitcoin: "Bitcoin",
   bsc: "BNB Chain",
   solana: "Solana",
+  tron: "TRON",
 };
 
 const NET_SHORT: Record<WalletNetwork, string> = {
@@ -41,6 +43,7 @@ const NET_SHORT: Record<WalletNetwork, string> = {
   bitcoin: "BTC",
   bsc: "BSC",
   solana: "SOL",
+  tron: "TRX",
 };
 
 const EMPTY_EVM = "0x0000000000000000000000000000000000000000";
@@ -58,7 +61,7 @@ type DisplayAsset = {
   spark7d: number[];
   spark7dTimestamps: number[];
   image: string;
-  kind: "native" | "evm" | "spl";
+  kind: "native" | "evm" | "spl" | "trc20";
   assetRef: AssetRef;
   nativeRef?: AssetInfo;
 };
@@ -336,7 +339,7 @@ const up: Variants = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, 
 export function Dashboard() {
   const { t } = useI18n();
   const {
-    assets, evmTokens, splTokens, transactions, addresses, loading, initialLoaded, loadingState, lastUpdated, setView, openTransfer, setEcosystemTab, openAsset,
+    assets, evmTokens, splTokens, trc20Tokens, transactions, addresses, loading, initialLoaded, loadingState, lastUpdated, setView, openTransfer, setEcosystemTab, openAsset,
     sessionMode, watchName, activeAccountIndex,
     privacyMode, setPrivacyMode, hideZeroBalances, setHideZeroBalances, hiddenAssetIds, verifiedHistoryOnly,
   } = useWalletStore();
@@ -399,7 +402,23 @@ export function Dashboard() {
       kind: "spl" as const,
       assetRef: { kind: "spl" as const, id: token.mint, network: "solana" as const },
     })),
-  ], [assets, evmTokens, splTokens]);
+    ...trc20Tokens.map((token) => ({
+      id: `trc20:${token.contract}`,
+      symbol: token.symbol,
+      name: token.name,
+      network: "tron" as const,
+      balance: token.balance,
+      priceUSD: token.priceUSD,
+      valueUSD: token.valueUSD,
+      change24h: token.change24h,
+      change7d: 0,
+      spark7d: [],
+      spark7dTimestamps: [],
+      image: token.image,
+      kind: "trc20" as const,
+      assetRef: { kind: "trc20" as const, id: token.contract, network: "tron" as const },
+    })),
+  ], [assets, evmTokens, splTokens, trc20Tokens]);
 
   const activeAssets = useMemo(() => allAssets.filter((asset) => !hiddenAssetIds.includes(asset.id)), [allAssets, hiddenAssetIds]);
   const portfolioPoints = useMemo<ChartPoint[]>(() => {
@@ -450,7 +469,7 @@ export function Dashboard() {
   const addr = addresses
     ? addresses.ethereum && addresses.ethereum !== EMPTY_EVM
       ? addresses.ethereum
-      : addresses.bitcoin || addresses.solana || null
+      : addresses.bitcoin || addresses.solana || addresses.tron || null
     : null;
   const watchOnly = sessionMode === "watch";
 

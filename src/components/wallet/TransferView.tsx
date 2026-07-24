@@ -7,10 +7,11 @@ import { GlassInput }  from "@/components/ui/GlassInput";
 import { Icons }       from "@/components/ui/Icon";
 import { CryptoIcon }  from "@/components/ui/CryptoIcon";
 import { useWalletStore } from "@/lib/store";
-import { deriveNetworkAddress, derivePrivateKey } from "@/lib/wallet";
+import { deriveNetworkAddress, derivePrivateKey, deriveTronPrivateKey } from "@/lib/wallet";
 import { sendEth, sendBnb, sendErc20, estimateGasUSD } from "@/lib/chains";
 import { bitcoinAddressForNetwork, sendBtc } from "@/lib/bitcoin";
 import { sendSol } from "@/lib/solana";
+import { getTronTransactionStatus, isTronAddress, sendTrc20, sendTrx, type Trc20Token } from "@/lib/tron";
 import { formatUSD, formatCrypto, shortenAddress } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 import type { AssetInfo, AssetRef } from "@/lib/store";
@@ -35,12 +36,12 @@ type PickAsset = {
   name:     string;
   balance:  number;
   priceUSD: number;
-  network:  "ethereum" | "bsc" | "bitcoin" | "solana";
+  network:  "ethereum" | "bsc" | "bitcoin" | "solana" | "tron";
   image:    string;
   isToken:  boolean;
   ref:      AssetRef;
-  tokenKind?: "evm" | "spl";
-  contract?: `0x${string}`;
+  tokenKind?: "evm" | "spl" | "trc20";
+  contract?: string;
   decimals?: number;
 };
 
@@ -68,9 +69,19 @@ function fromSplToken(t: SplToken): PickAsset {
     ref: { kind: "spl", id: t.mint, network: "solana" },
   };
 }
+function fromTrc20Token(t: Trc20Token): PickAsset {
+  return {
+    id: `trc20_${t.contract}`, symbol: t.symbol, name: t.name,
+    balance: t.balance, priceUSD: t.priceUSD,
+    network: "tron", image: t.image, isToken: true, tokenKind: "trc20",
+    ref: { kind: "trc20", id: t.contract, network: "tron" },
+    contract: t.contract,
+    decimals: t.decimals,
+  };
+}
 
 function canSendAsset(asset: PickAsset) {
-  return !asset.isToken || asset.tokenKind === "evm";
+  return !asset.isToken || asset.tokenKind === "evm" || asset.tokenKind === "trc20";
 }
 
 function sameAssetRef(asset: PickAsset, ref: AssetRef) {
@@ -83,16 +94,19 @@ const NET_BG: Record<string, string> = {
   bitcoin:  "rgba(247,147,26,0.14)",
   bsc:      "rgba(240,185,11,0.14)",
   solana:   "rgba(153,69,255,0.14)",
+  tron:     "rgba(255,69,79,0.14)",
 };
 const NET_LABEL: Record<string, string> = {
   ethereum: "Ethereum", bitcoin: "Bitcoin", bsc: "BNB Chain", solana: "Solana",
+  tron: "TRON",
 };
 const NET_SHORT: Record<string, string> = {
   ethereum: "ETH", bitcoin: "BTC", bsc: "BSC", solana: "SOL",
+  tron: "TRX",
 };
 const EXPLORERS: Record<string, Record<string, string>> = {
-  mainnet: { ethereum: "https://etherscan.io/tx/", bitcoin: "https://blockstream.info/tx/", bsc: "https://bscscan.com/tx/", solana: "https://solscan.io/tx/" },
-  testnet: { ethereum: "https://sepolia.etherscan.io/tx/", bitcoin: "https://blockstream.info/testnet/tx/", bsc: "https://testnet.bscscan.com/tx/", solana: "https://solscan.io/tx/" },
+  mainnet: { ethereum: "https://etherscan.io/tx/", bitcoin: "https://blockstream.info/tx/", bsc: "https://bscscan.com/tx/", solana: "https://solscan.io/tx/", tron: "https://tronscan.org/#/transaction/" },
+  testnet: { ethereum: "https://sepolia.etherscan.io/tx/", bitcoin: "https://blockstream.info/testnet/tx/", bsc: "https://testnet.bscscan.com/tx/", solana: "https://solscan.io/tx/", tron: "https://nile.tronscan.org/#/transaction/" },
 };
 
 type Tab      = "send" | "receive";
@@ -225,7 +239,7 @@ function GasEstimate({ asset, network }: { asset: PickAsset; network: string }) 
   const [fee, setFee] = useState<number | null>(null);
 
   useEffect(() => {
-    if (asset.network === "bitcoin" || asset.network === "solana") return;
+    if (asset.network === "bitcoin" || asset.network === "solana" || asset.network === "tron") return;
     const net = network as "mainnet" | "testnet";
     const load = () => estimateGasUSD(asset.priceUSD || 2500, net).then(setFee).catch(() => setFee(null));
     load();
@@ -233,8 +247,8 @@ function GasEstimate({ asset, network }: { asset: PickAsset; network: string }) 
     return () => clearInterval(id);
   }, [asset, network]);
 
-  if (asset.network === "bitcoin" || asset.network === "solana") {
-    return <span style={{ fontSize: 12, color: "rgba(255,255,255,0.28)" }}>{t("Network fee calculated on send")}</span>;
+  if (asset.network === "bitcoin" || asset.network === "solana" || asset.network === "tron") {
+    return <span style={{ fontSize: 12, color: "rgba(255,255,255,0.28)" }}>{t(asset.network === "tron" ? "Bandwidth / energy calculated on send" : "Network fee calculated on send")}</span>;
   }
 
   return fee === null
@@ -447,6 +461,10 @@ function TxTracker({ hash, assetNetwork, network }: { hash: string; assetNetwork
     if (assetNetwork === "bitcoin" || assetNetwork === "solana") return;
     const poll = async () => {
       try {
+        if (assetNetwork === "tron") {
+          setStatus(await getTronTransactionStatus(hash, net));
+          return;
+        }
         const { createPublicClient, http } = await import("viem");
         const { sepolia, mainnet, bsc, bscTestnet } = await import("viem/chains");
         const chain = assetNetwork === "bsc"
@@ -505,7 +523,7 @@ function TxTracker({ hash, assetNetwork, network }: { hash: string; assetNetwork
 /* ── MAIN ────────────────────────────────────────────────────────── */
 export function TransferView() {
   const { t: tr } = useI18n();
-  const { assets, evmTokens, splTokens, addresses, mnemonic, network, activeAccountIndex, activeAddressIndexes, setTxs, hiddenAssetIds, transferIntent, clearTransferIntent, transactions, loading: walletLoading, initialLoaded } = useWalletStore();
+  const { assets, evmTokens, splTokens, trc20Tokens, addresses, mnemonic, network, activeAccountIndex, activeAddressIndexes, setTxs, hiddenAssetIds, transferIntent, clearTransferIntent, transactions, loading: walletLoading, initialLoaded } = useWalletStore();
   const toast = useToast();
   const addressBook = useAddressBook();
   const accounts = useWalletAccounts();
@@ -515,7 +533,8 @@ export function TransferView() {
     ...assets.filter((a) => !hiddenAssetIds.includes(`native:${a.id}`)).map(fromNative),
     ...evmTokens.filter((t) => !hiddenAssetIds.includes(`evm:${t.chain}:${t.contract.toLowerCase()}`)).map(fromEvmToken),
     ...splTokens.filter((t) => !hiddenAssetIds.includes(`spl:${t.mint}`)).map(fromSplToken),
-  ], [assets, evmTokens, splTokens, hiddenAssetIds]);
+    ...trc20Tokens.filter((t) => !hiddenAssetIds.includes(`trc20:${t.contract}`)).map(fromTrc20Token),
+  ], [assets, evmTokens, splTokens, trc20Tokens, hiddenAssetIds]);
 
   const [tab,    setTab]    = useState<Tab>("send");
   const [step,   setStep]   = useState<Step>("form");
@@ -570,15 +589,18 @@ export function TransferView() {
   const activeAssetAddressIndex = effectiveAsset ? activeAddressIndexes[effectiveAsset.network] ?? 0 : 0;
   const amountUSD = effectiveAsset ? amountNum * effectiveAsset.priceUSD : 0;
   const isEVM     = effectiveAsset?.network === "ethereum" || effectiveAsset?.network === "bsc";
-  const isNativeSend = effectiveAsset && !effectiveAsset.isToken && (effectiveAsset.network === "ethereum" || effectiveAsset.network === "bsc" || effectiveAsset.network === "bitcoin" || effectiveAsset.network === "solana");
+  const isNativeSend = effectiveAsset && !effectiveAsset.isToken && (effectiveAsset.network === "ethereum" || effectiveAsset.network === "bsc" || effectiveAsset.network === "bitcoin" || effectiveAsset.network === "solana" || effectiveAsset.network === "tron");
   const isEvmTokenSend = !!effectiveAsset?.isToken && effectiveAsset.tokenKind === "evm";
-  const canSend = !!effectiveAsset && canSendAsset(effectiveAsset) && (isNativeSend || isEvmTokenSend);
+  const isTrc20TokenSend = !!effectiveAsset?.isToken && effectiveAsset.tokenKind === "trc20";
+  const canSend = !!effectiveAsset && canSendAsset(effectiveAsset) && (isNativeSend || isEvmTokenSend || isTrc20TokenSend);
 
   const isValidAddr = isEVM
     ? /^0x[0-9a-fA-F]{40}$/.test(toAddr)
     : effectiveAsset?.network === "bitcoin"
       ? /^(bc1|tb1|[13mn2])[a-zA-HJ-NP-Z0-9]{25,80}$/.test(toAddr)
-      : /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(toAddr);
+      : effectiveAsset?.network === "tron"
+        ? isTronAddress(toAddr)
+        : /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(toAddr);
 
   const isValid = amountNum > 0 && !!effectiveAsset && amountNum <= effectiveAsset.balance && isValidAddr && canSend;
   const savedRecipient = addressBook.find((contact) => {
@@ -601,13 +623,24 @@ export function TransferView() {
     if (!canSend) { setError(`${selectedAsset.symbol} sending is not available for this asset type`); return; }
     setLoading(true); setError("");
     try {
-      const privKey = derivePrivateKey(mnemonic, activeAccountIndex, activeAssetAddressIndex);
+      const privKey = selectedAsset.network === "tron"
+        ? deriveTronPrivateKey(mnemonic, activeAccountIndex, activeAssetAddressIndex)
+        : derivePrivateKey(mnemonic, activeAccountIndex, activeAssetAddressIndex);
       let hash: string;
 
-      if (selectedAsset.isToken && selectedAsset.contract && selectedAsset.decimals !== undefined) {
+      if (selectedAsset.tokenKind === "trc20" && selectedAsset.contract && selectedAsset.decimals !== undefined) {
+        hash = await sendTrc20({
+          privateKey: privKey,
+          tokenContract: selectedAsset.contract,
+          to: toAddr,
+          amount,
+          decimals: selectedAsset.decimals,
+          network,
+        });
+      } else if (selectedAsset.isToken && selectedAsset.contract && selectedAsset.decimals !== undefined) {
         hash = await sendErc20({
           privateKey:    privKey,
-          tokenContract: selectedAsset.contract,
+          tokenContract: selectedAsset.contract as `0x${string}`,
           to:            toAddr as `0x${string}`,
           amount,
           decimals:      selectedAsset.decimals,
@@ -620,6 +653,8 @@ export function TransferView() {
         hash = await sendBnb({ privateKey: privKey, to: toAddr as `0x${string}`, amount, net: network });
       } else if (selectedAsset.network === "bitcoin") {
         hash = await sendBtc({ mnemonic, to: toAddr, amount, net: network, accountIndex: activeAccountIndex, addressIndex: activeAddressIndexes.bitcoin });
+      } else if (selectedAsset.network === "tron") {
+        hash = await sendTrx({ privateKey: privKey, to: toAddr, amount, network });
       } else {
         hash = await sendSol({ mnemonic, to: toAddr, amount, network, accountIndex: activeAccountIndex, addressIndex: activeAddressIndexes.solana });
       }
@@ -637,7 +672,7 @@ export function TransferView() {
         status: "pending" as const,
         isToken: selectedAsset.isToken,
         tokenSymbol: selectedAsset.isToken ? selectedAsset.symbol : undefined,
-        tokenContract: selectedAsset.tokenKind === "evm" ? selectedAsset.contract : undefined,
+        tokenContract: selectedAsset.isToken ? selectedAsset.contract : undefined,
         network: selectedAsset.network,
         id: `${hash}:pending:${selectedAsset.id}`,
       };
@@ -654,6 +689,7 @@ export function TransferView() {
   const receiveAddr = !effectiveAsset ? ""
     : effectiveAsset.network === "bitcoin" ? (mnemonic ? bitcoinAddressForNetwork(mnemonic, network, activeAccountIndex, activeAddressIndexes.bitcoin) : (addresses?.bitcoin ?? ""))
     : effectiveAsset.network === "solana"  ? (addresses?.solana   ?? "")
+    : effectiveAsset.network === "tron"    ? (addresses?.tron     ?? "")
     : effectiveAsset.network === "bsc"     ? (addresses?.bsc      ?? "")
     :                               (addresses?.ethereum ?? "");
 
@@ -682,6 +718,26 @@ export function TransferView() {
   );
 
   const asset = effectiveAsset;
+  const reviewWarnings = buildTransactionWarnings({
+    amount: amountNum,
+    amountText: amount,
+    assetSymbol: asset.symbol,
+    assetBalance: asset.balance,
+    recipient: toAddr,
+    networkLabel: NET_LABEL[asset.network],
+    estimatedFee: gasFee ? formatUSD(gasFee) : undefined,
+    amountUSD,
+    watchOnly: false,
+    addressBookContact: savedRecipient,
+    transactions,
+  });
+  if (asset.tokenKind === "trc20" && (assets.find((item) => item.id === "trx")?.balance ?? 0) <= 0) {
+    reviewWarnings.push({
+      id: "tron-energy",
+      tone: "warning",
+      message: tr("TRC-20 transfers require Energy/Bandwidth. Keep TRX available for fees unless this address receives delegated Energy."),
+    });
+  }
 
   /* ─── SUCCESS ─────────────────────────────────────────────────── */
   if (step === "done") return (
@@ -725,21 +781,9 @@ export function TransferView() {
           recipient={toAddr}
           network={NET_LABEL[asset.network]}
           sourceAccount={activeAccount ? `${activeAccount.name}${activeAssetAddressIndex > 0 ? ` / Address ${activeAssetAddressIndex + 1}` : ""}` : undefined}
-          fee={gasFee ? formatUSD(gasFee) : "Calculated on broadcast"}
+          fee={asset.network === "tron" ? tr("Bandwidth / Energy (max 100 TRX)") : gasFee ? formatUSD(gasFee) : tr("Calculated on broadcast")}
           contactName={savedRecipient?.name}
-          warnings={buildTransactionWarnings({
-            amount: amountNum,
-            amountText: amount,
-            assetSymbol: asset.symbol,
-            assetBalance: asset.balance,
-            recipient: toAddr,
-            networkLabel: NET_LABEL[asset.network],
-            estimatedFee: gasFee ? formatUSD(gasFee) : undefined,
-            amountUSD,
-            watchOnly: false,
-            addressBookContact: savedRecipient,
-            transactions,
-          })}
+          warnings={reviewWarnings}
         />
         {network === "testnet" && (
           <div style={{ display: "flex", gap: 8, padding: "10px 14px", borderRadius: 12, background: "rgba(251,191,36,0.07)", border: "1px solid rgba(251,191,36,0.20)" }}>
@@ -797,7 +841,7 @@ export function TransferView() {
 
             <GlassInput
               label={tr("Recipient address")}
-              placeholder={isEVM ? "0x…" : "bc1… or 1…"}
+              placeholder={isEVM ? "0x…" : asset.network === "tron" ? "T…" : asset.network === "solana" ? tr("Solana address") : "bc1… or 1…"}
               value={toAddr}
               onChange={(e) => { setToAddr(e.target.value); setError(""); }}
             />
@@ -931,7 +975,9 @@ export function TransferView() {
             )}
 
             <div className="receive-warning" style={{ fontSize: 12, color: "rgba(255,255,255,0.18)", textAlign: "center", lineHeight: 1.5 }}>
-              {asset.isToken
+              {asset.network === "tron"
+                ? tr("Only send TRX and TRC-20 assets to this TRON address.")
+                : asset.isToken
                 ? `Send only ${asset.symbol} (${NET_LABEL[asset.network]}) to this address.`
                 : `Only send ${asset.symbol} (${NET_LABEL[asset.network]}) to this address.`
               }

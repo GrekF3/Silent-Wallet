@@ -15,6 +15,7 @@ const NETWORK_OPTIONS: { id: AddressBookNetwork; label: string }[] = [
   { id: "bsc", label: "BNB Chain" },
   { id: "bitcoin", label: "Bitcoin" },
   { id: "solana", label: "Solana" },
+  { id: "tron", label: "TRON (TRC-20)" },
 ];
 
 function NetworkDropdown({ value, onChange }: { value: AddressBookNetwork; onChange: (value: AddressBookNetwork) => void }) {
@@ -93,7 +94,7 @@ export function AddressBookModal({
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <GlassInput label="Name" value={name} onChange={(event) => { setName(event.target.value); setError(""); }} placeholder="Treasury" />
-            <GlassInput label="Address" value={address} onChange={(event) => { setAddress(event.target.value); setError(""); }} placeholder="0x..., bc1..., or Solana address" />
+            <GlassInput label="Address" value={address} onChange={(event) => { setAddress(event.target.value); setError(""); }} placeholder="0x..., bc1..., Solana, or T..." />
             <NetworkDropdown value={network} onChange={setNetwork} />
             <GlassInput label="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Local note, never private keys" />
             <button type="button" onClick={() => setTrusted((value) => !value)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 12px", borderRadius: 13, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.62)", font: "inherit", cursor: "pointer", textAlign: "left" }}>

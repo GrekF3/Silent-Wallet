@@ -6,6 +6,7 @@ import type { Prices } from "./prices";
 import type { ChainTx, Network } from "./chains";
 import type { EvmToken } from "./tokens";
 import type { SplToken } from "./solana";
+import type { Trc20Token } from "./tron";
 import { saveSession, saveWatchSession, clearSession as clearSess, type SessionMode } from "./session";
 
 export type View = "dashboard" | "asset" | "transfer" | "history" | "settings" | "ecosystem" | "learn" | "premium" | "accounts" | "addressBook";
@@ -23,7 +24,7 @@ export type SourceState = {
 export type WalletLoadingState = Record<DataSource, SourceState>;
 
 export type AssetRef = {
-  kind: "native" | "evm" | "spl";
+  kind: "native" | "evm" | "spl" | "trc20";
   id: string;
   network: AssetInfo["network"];
 };
@@ -37,7 +38,7 @@ export type AssetInfo = {
   id:        string;
   symbol:    string;
   name:      string;
-  network:   "ethereum" | "bitcoin" | "bsc" | "solana";
+  network:   "ethereum" | "bitcoin" | "bsc" | "solana" | "tron";
   balance:   number;
   priceUSD:  number;
   change24h: number;
@@ -113,6 +114,7 @@ type WalletStore = {
   assets:        AssetInfo[];
   evmTokens:     EvmToken[];
   splTokens:     SplToken[];
+  trc20Tokens:   Trc20Token[];
   transactions:  ChainTx[];
   prices:        Prices | null;
   loading:       boolean;
@@ -125,7 +127,7 @@ type WalletStore = {
   verifiedHistoryOnly: boolean;
 
   setAssets:        (a: AssetInfo[]) => void;
-  setTokens:        (evm: EvmToken[], spl: SplToken[]) => void;
+  setTokens:        (evm: EvmToken[], spl: SplToken[], trc20?: Trc20Token[]) => void;
   setTxs:           (t: ChainTx[]) => void;
   setPrices:        (p: Prices) => void;
   setLoading:       (l: boolean) => void;
@@ -168,6 +170,7 @@ export const useWalletStore = create<WalletStore>((set) => ({
       assets: [],
       evmTokens: [],
       splTokens: [],
+      trc20Tokens: [],
       transactions: [],
       selectedAssetRef: null,
       selectedAsset: null,
@@ -193,6 +196,7 @@ export const useWalletStore = create<WalletStore>((set) => ({
       assets: [],
       evmTokens: [],
       splTokens: [],
+      trc20Tokens: [],
       transactions: [],
       selectedAssetRef: null,
       selectedAsset: null,
@@ -207,10 +211,10 @@ export const useWalletStore = create<WalletStore>((set) => ({
       },
     };
   }),
-  clearSession: () => { clearSess(); set({ sessionMode: "wallet", watchName: null, mnemonic: null, addresses: null, activeAccountIndex: 0, activeAddressIndexes: DEFAULT_ADDRESS_INDEXES, assets: [], evmTokens: [], splTokens: [], transactions: [], selectedAssetRef: null, selectedAsset: null, transferIntent: null, initialLoaded: false, lastUpdated: null }); },
+  clearSession: () => { clearSess(); set({ sessionMode: "wallet", watchName: null, mnemonic: null, addresses: null, activeAccountIndex: 0, activeAddressIndexes: DEFAULT_ADDRESS_INDEXES, assets: [], evmTokens: [], splTokens: [], trc20Tokens: [], transactions: [], selectedAssetRef: null, selectedAsset: null, transferIntent: null, initialLoaded: false, lastUpdated: null }); },
 
   network:    "mainnet",
-  setNetwork: (network) => set({ network, assets: [], evmTokens: [], splTokens: [], transactions: [], selectedAssetRef: null, selectedAsset: null, transferIntent: null, initialLoaded: false, lastUpdated: null }),
+  setNetwork: (network) => set({ network, assets: [], evmTokens: [], splTokens: [], trc20Tokens: [], transactions: [], selectedAssetRef: null, selectedAsset: null, transferIntent: null, initialLoaded: false, lastUpdated: null }),
 
   view:          "dashboard",
   setView:       (view) => set({ view }),
@@ -227,6 +231,7 @@ export const useWalletStore = create<WalletStore>((set) => ({
   assets:        [],
   evmTokens:     [],
   splTokens:     [],
+  trc20Tokens:   [],
   transactions:  [],
   prices:        null,
   loading:       false,
@@ -249,7 +254,7 @@ export const useWalletStore = create<WalletStore>((set) => ({
       : state.selectedAsset;
     return { assets, selectedAsset };
   }),
-  setTokens:        (evmTokens, splTokens) => set({ evmTokens, splTokens }),
+  setTokens:        (evmTokens, splTokens, trc20Tokens = []) => set({ evmTokens, splTokens, trc20Tokens }),
   setTxs:           (transactions) => set({ transactions }),
   setPrices:        (prices)      => set({ prices }),
   setLoading:       (loading)     => set({ loading }),

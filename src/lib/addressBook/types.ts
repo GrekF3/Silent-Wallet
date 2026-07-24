@@ -1,4 +1,4 @@
-export type AddressBookNetwork = "ethereum" | "bsc" | "bitcoin" | "solana" | "any";
+export type AddressBookNetwork = "ethereum" | "bsc" | "bitcoin" | "solana" | "tron" | "any";
 
 export type AddressBookContact = {
   id: string;

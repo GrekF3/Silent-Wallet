@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { AddressBookContact, AddressBookNetwork } from "./types";
+import { isTronAddress } from "../tron";
 
 const KEY = "silent_address_book_v1";
 const EVENT = "silent-address-book-change";
@@ -24,6 +25,7 @@ export function isValidAddressBookAddress(address: string) {
   const value = address.trim();
   return /^0x[0-9a-fA-F]{40}$/.test(value)
     || /^(bc1|tb1|[13mn2])[a-zA-HJ-NP-Z0-9]{25,80}$/.test(value)
+    || isTronAddress(value)
     || /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
 }
 
@@ -31,6 +33,7 @@ export function inferAddressNetwork(address: string): AddressBookNetwork {
   const value = address.trim();
   if (/^0x[0-9a-fA-F]{40}$/.test(value)) return "ethereum";
   if (/^(bc1|tb1|[13mn2])[a-zA-HJ-NP-Z0-9]{25,80}$/.test(value)) return "bitcoin";
+  if (isTronAddress(value)) return "tron";
   if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value)) return "solana";
   return "any";
 }
@@ -59,7 +62,7 @@ function readContacts(): AddressBookContact[] {
 }
 
 function normalizeNetwork(value: unknown): AddressBookNetwork {
-  return value === "ethereum" || value === "bsc" || value === "bitcoin" || value === "solana" || value === "any" ? value : "any";
+  return value === "ethereum" || value === "bsc" || value === "bitcoin" || value === "solana" || value === "tron" || value === "any" ? value : "any";
 }
 
 function makeId() {
@@ -95,7 +98,7 @@ export function upsertAddressBookContact(input: {
   trusted?: boolean;
 }) {
   const address = input.address.trim();
-  if (!isValidAddressBookAddress(address)) throw new Error("Enter a valid Ethereum, BNB Chain, Bitcoin, or Solana address.");
+  if (!isValidAddressBookAddress(address)) throw new Error("Enter a valid Ethereum, BNB Chain, Bitcoin, Solana, or TRON address.");
 
   const contacts = readContacts();
   const now = Date.now();

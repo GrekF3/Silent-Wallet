@@ -1,6 +1,6 @@
 # Silent Wallet - **Open Source Crypto Wallet**
 
-Open-source self-custodial crypto wallet for ETH, BTC, BNB Chain, and Solana.
+Open-source self-custodial crypto wallet for ETH, BTC, BNB Chain, Solana, and TRON/TRC-20.
 
 Silent Wallet is built to feel calm and useful for real people. The free wallet stays strong: create, import, watch, send, receive, default account, basic portfolio, basic history, Academy, address book, privacy mode, and beginner guidance are not premium features.
 

@@ -1,11 +1,12 @@
 import type { ChainTx } from "./chains";
 
 export type EvmTokenNetwork = "ethereum" | "bsc";
+export type VerifiedTokenNetwork = EvmTokenNetwork | "tron";
 export type TransactionVerification = "native" | "verified" | "unverified";
 
-export type VerifiedEvmToken = {
-  network: EvmTokenNetwork;
-  contract: `0x${string}`;
+export type VerifiedToken = {
+  network: VerifiedTokenNetwork;
+  contract: string;
   symbol: string;
   name: string;
   decimals: number;
@@ -13,7 +14,14 @@ export type VerifiedEvmToken = {
   usdPeg?: boolean;
 };
 
+export type VerifiedEvmToken = VerifiedToken & {
+  network: EvmTokenNetwork;
+  contract: `0x${string}`;
+};
+
 // Contract addresses are the identity. Symbols and names are display metadata only.
+export const TRON_USDT_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
+
 export const VERIFIED_EVM_TOKENS: readonly VerifiedEvmToken[] = [
   { network: "ethereum", contract: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", symbol: "WETH", name: "Wrapped Ether", decimals: 18, cgId: "weth" },
   { network: "ethereum", contract: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", symbol: "USDC", name: "USD Coin", decimals: 6, cgId: "usd-coin", usdPeg: true },
@@ -42,22 +50,32 @@ export const VERIFIED_EVM_TOKENS: readonly VerifiedEvmToken[] = [
   { network: "bsc", contract: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", symbol: "WBNB", name: "Wrapped BNB", decimals: 18, cgId: "wbnb" },
 ] as const;
 
+export const VERIFIED_TOKENS: readonly VerifiedToken[] = [
+  ...VERIFIED_EVM_TOKENS,
+  { network: "tron", contract: TRON_USDT_CONTRACT, symbol: "USDT", name: "Tether USD (TRC-20)", decimals: 6, cgId: "tether", usdPeg: true },
+] as const;
+
 const TOKEN_BY_NETWORK_AND_CONTRACT = new Map(
-  VERIFIED_EVM_TOKENS.map((token) => [`${token.network}:${token.contract.toLowerCase()}`, token] as const),
+  VERIFIED_TOKENS.map((token) => [`${token.network}:${token.contract.toLowerCase()}`, token] as const),
 );
 
 export function verifiedEvmToken(network: string | undefined, contract: string | undefined): VerifiedEvmToken | undefined {
   if ((network !== "ethereum" && network !== "bsc") || !contract) return undefined;
+  return TOKEN_BY_NETWORK_AND_CONTRACT.get(`${network}:${contract.toLowerCase()}`) as VerifiedEvmToken | undefined;
+}
+
+export function verifiedToken(network: string | undefined, contract: string | undefined): VerifiedToken | undefined {
+  if ((network !== "ethereum" && network !== "bsc" && network !== "tron") || !contract) return undefined;
   return TOKEN_BY_NETWORK_AND_CONTRACT.get(`${network}:${contract.toLowerCase()}`);
 }
 
 export function verifiedTokenAmountUSD(network: string | undefined, contract: string | undefined, amount: number): number {
-  return verifiedEvmToken(network, contract)?.usdPeg ? Math.abs(amount) : 0;
+  return verifiedToken(network, contract)?.usdPeg ? Math.abs(amount) : 0;
 }
 
 export function transactionVerification(tx: Pick<ChainTx, "isToken" | "network" | "tokenContract">): TransactionVerification {
   if (!tx.isToken) return "native";
-  return verifiedEvmToken(tx.network, tx.tokenContract) ? "verified" : "unverified";
+  return verifiedToken(tx.network, tx.tokenContract) ? "verified" : "unverified";
 }
 
 export function withTransactionVerification<T extends ChainTx>(tx: T): T {

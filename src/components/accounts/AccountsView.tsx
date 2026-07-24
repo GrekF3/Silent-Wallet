@@ -136,6 +136,7 @@ export function AccountsView() {
     assets,
     evmTokens,
     splTokens,
+    trc20Tokens,
     hiddenAssetIds,
     privacyMode,
     activeAccountIndex,
@@ -160,12 +161,15 @@ export function AccountsView() {
     const solanaAssets = splTokens
       .filter((token) => !hiddenAssetIds.includes(`spl:${token.mint}`))
       .map((token) => ({ balance: token.amount, value: token.amount * (token.priceUSD ?? 0) }));
-    const all = [...nativeAssets, ...evmAssets, ...solanaAssets];
+    const tronAssets = trc20Tokens
+      .filter((token) => !hiddenAssetIds.includes(`trc20:${token.contract}`))
+      .map((token) => ({ balance: token.balance, value: token.valueUSD }));
+    const all = [...nativeAssets, ...evmAssets, ...solanaAssets, ...tronAssets];
     return {
       total: all.reduce((sum, asset) => sum + asset.value, 0),
       assetCount: all.filter((asset) => asset.balance > 0).length,
     };
-  }, [assets, evmTokens, hiddenAssetIds, splTokens]);
+  }, [assets, evmTokens, hiddenAssetIds, splTokens, trc20Tokens]);
 
   const createAccount = (name: string) => {
     const account = createWalletAccount({ name: name.trim() || `Account ${visibleAccounts.length + 1}` });

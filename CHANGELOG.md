@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Added TRON accounts with BIP-44 address derivation, account separation, and watch-only support.
+- Added TRX balances, pricing, history, sending, and receiving.
+- Added verified USDT TRC-20 balances, history, locally signed transfers, and TronScan links.
+
 ## 0.1.7
 
 - Added verified-token history filtering, enabled by default, to hide unknown incoming token spam without removing it.

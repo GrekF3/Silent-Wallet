@@ -3,7 +3,7 @@
 // sessionStorage is same-origin/same-tab only and not persisted to disk.
 
 import type { WalletAddresses, WalletAddressIndexes } from "./wallet";
-import { DEFAULT_ADDRESS_INDEXES, normalizeAddressIndexes } from "./wallet";
+import { DEFAULT_ADDRESS_INDEXES, normalizeAddressIndexes, normalizeWalletAddresses } from "./wallet";
 
 const KEY     = "silent_session_v1";
 const TIMEOUT = 10 * 60 * 1000; // 10 minutes
@@ -43,7 +43,7 @@ export function readSession(): { mode: SessionMode; watchName?: string; mnemonic
       mode: s.mode ?? "wallet",
       watchName: s.watchName,
       mnemonic: s.mnemonic,
-      addresses: s.addresses,
+      addresses: normalizeWalletAddresses(s.addresses),
       accountIndex: typeof s.accountIndex === "number" ? s.accountIndex : 0,
       addressIndexes: normalizeAddressIndexes(s.addressIndexes),
     };

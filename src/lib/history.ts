@@ -19,11 +19,13 @@ export async function fetchWalletHistory(
     bsc: addresses.bsc,
     btc: bitcoinAddress,
     sol: addresses.solana,
+    tron: addresses.tron,
     network,
     ethPrice: String(prices.ETH?.usd ?? 0),
     bnbPrice: String(prices.BNB?.usd ?? 0),
     btcPrice: String(prices.BTC?.usd ?? 0),
     solPrice: String(prices.SOL?.usd ?? 0),
+    trxPrice: String(prices.TRX?.usd ?? 0),
   });
 
   const r = await dataProxyFetch(dataProxyPath(`/api/history?${params.toString()}`), {

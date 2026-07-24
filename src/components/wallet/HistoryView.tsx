@@ -26,8 +26,8 @@ const FILTERS: { id: Filter; label: string }[] = [
 const PAGE_SIZE = 20;
 
 const EXPLORERS = {
-  mainnet: { ethereum: "https://etherscan.io/tx/", bsc: "https://bscscan.com/tx/", bitcoin: "https://blockstream.info/tx/", solana: "https://solscan.io/tx/" },
-  testnet: { ethereum: "https://sepolia.etherscan.io/tx/", bsc: "https://testnet.bscscan.com/tx/", bitcoin: "https://blockstream.info/testnet/tx/", solana: "https://solscan.io/tx/" },
+  mainnet: { ethereum: "https://etherscan.io/tx/", bsc: "https://bscscan.com/tx/", bitcoin: "https://blockstream.info/tx/", solana: "https://solscan.io/tx/", tron: "https://tronscan.org/#/transaction/" },
+  testnet: { ethereum: "https://sepolia.etherscan.io/tx/", bsc: "https://testnet.bscscan.com/tx/", bitcoin: "https://blockstream.info/testnet/tx/", solana: "https://solscan.io/tx/", tron: "https://nile.tronscan.org/#/transaction/" },
 } as const;
 
 function inferNetwork(tx: ChainTx): keyof typeof EXPLORERS.mainnet {

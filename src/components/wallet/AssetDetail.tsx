@@ -13,8 +13,9 @@ import { visibleHistoryTransactions } from "@/lib/tokenVerification";
 const NET_COLOR: Record<string, string> = {
   ethereum: "rgba(98,88,255,0.12)", bitcoin: "rgba(247,147,26,0.12)",
   bsc:      "rgba(240,185,11,0.12)", solana:  "rgba(153,69,255,0.12)",
+  tron:     "rgba(255,69,79,0.12)",
 };
-const NET_LABEL: Record<string, string> = { ethereum: "ETH", bitcoin: "BTC", bsc: "BSC", solana: "SOL" };
+const NET_LABEL: Record<string, string> = { ethereum: "ETH", bitcoin: "BTC", bsc: "BSC", solana: "SOL", tron: "TRX" };
 
 export function AssetDetail() {
   const { selectedAsset, closeAsset, openTransfer, transactions, sessionMode, verifiedHistoryOnly } = useWalletStore();

@@ -5,6 +5,7 @@ import { useWalletStore, type AssetInfo } from "./store";
 import { fetchPrices, type Prices } from "./prices";
 import { getBnbBalance, getBtcBalance, getEthBalance } from "./chains";
 import { getSolBalance, getSplTokens } from "./solana";
+import { getTrc20Tokens, getTrxBalance } from "./tron";
 import { bitcoinAddressForNetwork } from "./bitcoin";
 import { fetchAllEvmTokens } from "./tokens";
 import { fetchWalletHistory } from "./history";
@@ -40,6 +41,7 @@ function emptyPrices(): Prices {
     BTC:  { usd: 0, usd_24h_change: 0, usd_7d_change: 0, image: "", spark7d: [], spark7dTimestamps: [] },
     BNB:  { usd: 0, usd_24h_change: 0, usd_7d_change: 0, image: "", spark7d: [], spark7dTimestamps: [] },
     SOL:  { usd: 0, usd_24h_change: 0, usd_7d_change: 0, image: "", spark7d: [], spark7dTimestamps: [] },
+    TRX:  { usd: 0, usd_24h_change: 0, usd_7d_change: 0, image: "", spark7d: [], spark7dTimestamps: [] },
     USDC: { usd: 1, usd_24h_change: 0, usd_7d_change: 0, image: "", spark7d: [], spark7dTimestamps: [] },
   };
 }
@@ -82,6 +84,10 @@ function validSol(address: string | undefined) {
   return !!address && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address);
 }
 
+function validTron(address: string | undefined) {
+  return !!address && /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(address);
+}
+
 function cacheAddress(addresses: WalletAddresses, mode: string) {
   return [
     mode,
@@ -89,6 +95,7 @@ function cacheAddress(addresses: WalletAddresses, mode: string) {
     addresses.bsc || EMPTY_EVM,
     addresses.bitcoin || "",
     addresses.solana || "",
+    addresses.tron || "",
   ].join(":");
 }
 
@@ -128,7 +135,7 @@ function nativePrice(prices: Prices, previousAssets: AssetInfo[], symbol: keyof 
 }
 
 function buildNativeAssets(
-  balances: { eth: number; btc: number; bnb: number; sol: number },
+  balances: { eth: number; btc: number; bnb: number; sol: number; trx: number },
   prices: Prices,
   previousAssets: AssetInfo[],
 ): AssetInfo[] {
@@ -136,22 +143,25 @@ function buildNativeAssets(
   const btcPrice = nativePrice(prices, previousAssets, "BTC", "btc");
   const bnbPrice = nativePrice(prices, previousAssets, "BNB", "bnb");
   const solPrice = nativePrice(prices, previousAssets, "SOL", "sol");
+  const trxPrice = nativePrice(prices, previousAssets, "TRX", "trx");
 
   return [
     { id: "eth", symbol: "ETH", name: "Ethereum", network: "ethereum", balance: balances.eth, priceUSD: ethPrice, change24h: prices.ETH?.usd_24h_change ?? 0, change7d: prices.ETH?.usd_7d_change ?? 0, spark7d: prices.ETH?.spark7d ?? [], spark7dTimestamps: prices.ETH?.spark7dTimestamps ?? [], image: prices.ETH?.image ?? "", desc: "Smart contract platform" },
     { id: "btc", symbol: "BTC", name: "Bitcoin",  network: "bitcoin",  balance: balances.btc, priceUSD: btcPrice, change24h: prices.BTC?.usd_24h_change ?? 0, change7d: prices.BTC?.usd_7d_change ?? 0, spark7d: prices.BTC?.spark7d ?? [], spark7dTimestamps: prices.BTC?.spark7dTimestamps ?? [], image: prices.BTC?.image ?? "", desc: "Original decentralised currency" },
     { id: "bnb", symbol: "BNB", name: "BNB",      network: "bsc",      balance: balances.bnb, priceUSD: bnbPrice, change24h: prices.BNB?.usd_24h_change ?? 0, change7d: prices.BNB?.usd_7d_change ?? 0, spark7d: prices.BNB?.spark7d ?? [], spark7dTimestamps: prices.BNB?.spark7dTimestamps ?? [], image: prices.BNB?.image ?? "", desc: "BNB Chain native token" },
     { id: "sol", symbol: "SOL", name: "Solana",   network: "solana",   balance: balances.sol, priceUSD: solPrice, change24h: prices.SOL?.usd_24h_change ?? 0, change7d: prices.SOL?.usd_7d_change ?? 0, spark7d: prices.SOL?.spark7d ?? [], spark7dTimestamps: prices.SOL?.spark7dTimestamps ?? [], image: prices.SOL?.image ?? "", desc: "High-performance L1" },
+    { id: "trx", symbol: "TRX", name: "TRON",     network: "tron",     balance: balances.trx, priceUSD: trxPrice, change24h: prices.TRX?.usd_24h_change ?? 0, change7d: prices.TRX?.usd_7d_change ?? 0, spark7d: prices.TRX?.spark7d ?? [], spark7dTimestamps: prices.TRX?.spark7dTimestamps ?? [], image: prices.TRX?.image ?? "", desc: "TRON native token and TRC-20 fee asset" },
   ];
 }
 
-function filterWatchAssets(assets: AssetInfo[], available: { hasEth: boolean; hasBsc: boolean; hasBtc: boolean; hasSol: boolean }, sessionMode: string) {
+function filterWatchAssets(assets: AssetInfo[], available: { hasEth: boolean; hasBsc: boolean; hasBtc: boolean; hasSol: boolean; hasTron: boolean }, sessionMode: string) {
   if (sessionMode !== "watch") return assets;
   return assets.filter((asset) =>
     (asset.network === "ethereum" && available.hasEth) ||
     (asset.network === "bsc" && available.hasBsc) ||
     (asset.network === "bitcoin" && available.hasBtc) ||
-    (asset.network === "solana" && available.hasSol)
+    (asset.network === "solana" && available.hasSol) ||
+    (asset.network === "tron" && available.hasTron)
   );
 }
 
@@ -184,13 +194,15 @@ export function useChainData() {
       const hasBsc = validEvm(addresses.bsc);
       const hasBtc = validBtc(bitcoinAddress);
       const hasSol = validSol(addresses.solana);
-      const available = { hasEth, hasBsc, hasBtc, hasSol };
+      const hasTron = validTron(addresses.tron);
+      const available = { hasEth, hasBsc, hasBtc, hasSol, hasTron };
       const priceRequest = loadWithTimeout(fetchPrices(), FETCH_TIMEOUT);
-      const [ethBal, bnbBal, btcBal, solBal] = await Promise.all([
+      const [ethBal, bnbBal, btcBal, solBal, trxBal] = await Promise.all([
         hasEth ? loadWithTimeout(getEthBalance(addresses.ethereum, network), FETCH_TIMEOUT) : skipped(0),
         hasBsc ? loadWithTimeout(getBnbBalance(addresses.bsc, network), FETCH_TIMEOUT) : skipped(0),
         hasBtc ? loadWithTimeout(getBtcBalance(bitcoinAddress, network), FETCH_TIMEOUT) : skipped(0),
         hasSol ? loadWithTimeout(getSolBalance(addresses.solana, network), FETCH_TIMEOUT) : skipped(0),
+        hasTron ? loadWithTimeout(getTrxBalance(addresses.tron, network), FETCH_TIMEOUT) : skipped(0),
       ]);
 
       if (!isCurrentRequest()) return;
@@ -203,6 +215,7 @@ export function useChainData() {
         btc: safeBal(btcBal, "btc"),
         bnb: safeBal(bnbBal, "bnb"),
         sol: safeBal(solBal, "sol"),
+        trx: safeBal(trxBal, "trx"),
       };
       const provisionalPrices = usablePrices(balanceSnap.prices, prevAssets);
       const provisionalAssets = filterWatchAssets(buildNativeAssets(balances, provisionalPrices, prevAssets), available, sessionMode);
@@ -210,7 +223,7 @@ export function useChainData() {
       setAssets(provisionalAssets);
       setInitialLoaded(true);
       setLoading(false);
-      const balanceFailures = [ethBal, bnbBal, btcBal, solBal].filter((res) => !res.ok);
+      const balanceFailures = [ethBal, bnbBal, btcBal, solBal, trxBal].filter((res) => !res.ok);
       setSourceState("balances", {
         status: balanceFailures.length ? "partial" : "ready",
         error: balanceFailures.map((res) => !res.ok ? res.error : "").filter(Boolean).join("; ") || undefined,
@@ -221,6 +234,7 @@ export function useChainData() {
         transactions: balanceSnap.transactions,
         evmTokens: balanceSnap.evmTokens,
         splTokens: balanceSnap.splTokens,
+        trc20Tokens: balanceSnap.trc20Tokens,
         prices: balanceSnap.prices ?? pricesFromAssets(provisionalAssets),
       });
 
@@ -252,22 +266,24 @@ export function useChainData() {
 
       if (network === "mainnet") {
         setSourceState("tokens", { status: "refreshing", error: undefined });
-        const [evmTokens, splTokens] = await Promise.all([
+        const [evmTokens, splTokens, trc20Tokens] = await Promise.all([
           hasEth || hasBsc ? loadWithTimeout(fetchAllEvmTokens(hasEth ? addresses.ethereum : EMPTY_EVM as `0x${string}`, hasBsc ? addresses.bsc : EMPTY_EVM as `0x${string}`), 25_000) : skipped([]),
           hasSol ? loadWithTimeout(getSplTokens(addresses.solana, network), 15_000) : skipped([]),
+          hasTron ? loadWithTimeout(getTrc20Tokens(addresses.tron, network), 18_000) : skipped([]),
         ]);
         if (!isCurrentRequest()) return;
         const storeSnap = useWalletStore.getState();
         const nextEvm = evmTokens.ok ? evmTokens.value : storeSnap.evmTokens;
         const nextSpl = splTokens.ok ? splTokens.value : storeSnap.splTokens;
-        if (evmTokens.ok || splTokens.ok) setTokens(nextEvm, nextSpl);
+        const nextTrc20 = trc20Tokens.ok ? trc20Tokens.value : storeSnap.trc20Tokens;
+        if (evmTokens.ok || splTokens.ok || trc20Tokens.ok) setTokens(nextEvm, nextSpl, nextTrc20);
         setSourceState("tokens", {
-          status: evmTokens.ok && splTokens.ok ? "ready" : "partial",
-          error: [evmTokens, splTokens].map((res) => !res.ok ? res.error : "").filter(Boolean).join("; ") || undefined,
+          status: evmTokens.ok && splTokens.ok && trc20Tokens.ok ? "ready" : "partial",
+          error: [evmTokens, splTokens, trc20Tokens].map((res) => !res.ok ? res.error : "").filter(Boolean).join("; ") || undefined,
           updatedAt: Date.now(),
         });
       } else {
-        setTokens([], []);
+        setTokens([], [], []);
         setSourceState("tokens", { status: "ready", updatedAt: Date.now(), error: undefined });
       }
 
@@ -277,6 +293,7 @@ export function useChainData() {
         transactions: txs,
         evmTokens: finalSnap.evmTokens,
         splTokens: finalSnap.splTokens,
+        trc20Tokens: finalSnap.trc20Tokens,
         prices,
       });
     } catch (e) {
@@ -310,7 +327,7 @@ export function useChainData() {
       if (cached) {
         setAssets(cached.assets);
         setTxs(cached.transactions);
-        setTokens(cached.evmTokens ?? [], cached.splTokens ?? []);
+        setTokens(cached.evmTokens ?? [], cached.splTokens ?? [], cached.trc20Tokens ?? []);
         setPrices(cached.prices ?? pricesFromAssets(cached.assets));
         setSourceState("balances", { status: "refreshing", updatedAt: cached.ts, error: undefined });
         setSourceState("prices", { status: "refreshing", updatedAt: cached.ts, error: undefined });

@@ -36,16 +36,17 @@
     "bs58": "^6.0.0",
     "clsx": "^2.1.1",
     "ed25519-hd-key": "^2.0.0",
-    "ethers": "^6.16.0",
+    "ethers": "^6.17.0",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.14.0",
-    "next": "16.2.6",
+    "next": "16.2.11",
     "qrcode": "^1.5.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "tailwind-merge": "^3.5.0",
+    "tronweb": "^6.4.0",
     "tweetnacl": "^1.0.3",
-    "viem": "^2.48.11",
+    "viem": "^2.55.8",
     "zustand": "^5.0.13"
   },
   "devDependencies": {
@@ -56,9 +57,15 @@
     "@types/react-dom": "^19",
     "cross-env": "^10.1.0",
     "eslint": "^9",
-    "eslint-config-next": "16.2.6",
+    "eslint-config-next": "16.2.11",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "postcss": "8.5.22",
+    "sharp": "0.35.3",
+    "tar": "7.5.21",
+    "ws": "8.21.1"
   }
 }
